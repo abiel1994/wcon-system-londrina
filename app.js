@@ -1232,9 +1232,8 @@ function atualizarSeletorUnidade() {
   if (!wrap) return;
   if (!u || u.role !== 'gestor' && u.role !== 'adm' || u.unidadeEscopo) { wrap.innerHTML = ''; return; }
 
-  // NOVO: se só existe UMA unidade nos dados (ex: Londrina, sem uma 2ª
-  // unidade igual Blumenau), não faz sentido mostrar esse seletor — esconde
-  // sozinho, sem precisar de configuração manual por sistema.
+  // Se só existe UMA unidade nos dados (caso de Londrina, sem uma 2ª
+  // unidade tipo Blumenau), não faz sentido mostrar esse seletor.
   const unidadesExistentes = new Set(DB.vendedores.map(v => v.unidade || 'brusque'));
   if (unidadesExistentes.size <= 1) { wrap.innerHTML = ''; return; }
 
@@ -1294,7 +1293,7 @@ function buildSidebar() {
 
   const podeTabelas = podeAcessarTabelas();
   const visibles = isG
-    ? ['dashboard','trabalho','vendedores','clientes','funil','agendaFunil','relatorio','comissao','comissaoLideranca','inadimplencia','estornos','painelExecutivo','leadsPainel',...((!u.unidadeEscopo && new Set(DB.vendedores.map(v=>v.unidade||'brusque')).size>1)?['transferenciasUnidade']:[]),...(podeTabelas?['tabelas']:[]),'configuracoes']
+    ? ['dashboard','trabalho','vendedores','clientes','funil','agendaFunil','relatorio','comissao','comissaoLideranca','inadimplencia','estornos','painelExecutivo','leadsPainel',...(!u.unidadeEscopo?['transferenciasUnidade']:[]),...(podeTabelas?['tabelas']:[]),'configuracoes']
     : isSup
       ? ['dashboard','trabalho','funil','agendaFunil','relatorio','comissao','comissaoLideranca','inadimplencia','estornos',...(podeTabelas?['tabelas']:[])]
       : ['dashboard','trabalho','funil','agendaFunil','relatorio','comissao','inadimplencia','estornos',...(podeTabelas?['tabelas']:[])];
@@ -2003,26 +2002,14 @@ function abrirNovoVendedor() {
   document.getElementById('nv-email').value = '';
   const unidadeEscopo = unidadeEscopoAtual();
   const wrap = document.getElementById('nv-unidade-wrap');
-  const selectUnidade = document.getElementById('nv-unidade');
-
-  // NOVO: as opções do seletor são geradas a partir das unidades que
-  // REALMENTE existem no sistema (não mais fixas "Brusque"/"Blumenau") —
-  // assim funciona certo tanto pra sistemas com 1 unidade só (ex: Londrina)
-  // quanto pra multi-unidade (ex: Brusque+Blumenau)
-  const unidadesExistentes = [...new Set(DB.vendedores.map(v => v.unidade || 'brusque'))];
-  const unidadePadrao = unidadeEscopo || unidadesExistentes[0] || 'brusque';
-  const opcoes = unidadesExistentes.length > 0 ? unidadesExistentes : [unidadePadrao];
-  selectUnidade.innerHTML = opcoes.map(u => `<option value="${u}">${u.charAt(0).toUpperCase()+u.slice(1)}</option>`).join('');
-  selectUnidade.value = unidadePadrao;
-
   if (unidadeEscopo) {
     // Gerente de unidade (ex: Blumenau) não escolhe — sempre cadastra na
     // própria unidade dele
     wrap.style.display = 'none';
-  } else if (unidadesExistentes.length <= 1) {
-    wrap.style.display = 'none';
+    document.getElementById('nv-unidade').value = unidadeEscopo;
   } else {
     wrap.style.display = 'block';
+    document.getElementById('nv-unidade').value = 'brusque';
   }
   openModal('m-vendedor');
 }
@@ -2030,8 +2017,7 @@ function abrirNovoVendedor() {
 async function salvarNovoVendedor() {
   const nome  = document.getElementById('nv-nome').value.trim();
   const email = document.getElementById('nv-email').value.trim();
-  const unidadesExistentes = [...new Set(DB.vendedores.map(v => v.unidade || 'brusque'))];
-  const unidade = document.getElementById('nv-unidade').value || unidadeEscopoAtual() || unidadesExistentes[0] || 'brusque';
+  const unidade = document.getElementById('nv-unidade').value || unidadeEscopoAtual() || 'brusque';
 
   if (!nome)  { Dialog.alert('Campo obrigatório', ['Informe o nome do vendedor.']); return; }
   if (!email) { Dialog.alert('Campo obrigatório', ['Informe o e-mail do vendedor.']); return; }
@@ -4814,7 +4800,7 @@ function renderTabelas() {
 
   const pills = [
     ['all','Todas',tabsVis.length],
-    ...refs.map(r => [r, r, tabsVis.filter(t => t.ref === r).length]),
+    ...refs.map(r => [r, `Paga em ${r}`, tabsVis.filter(t => t.ref === r).length]),
   ].map(([s, lbl, cnt]) =>
     `<button class="filter-pill filter-pill-${s === 'all' ? 'all' : 'gray'}${st.filterRef === s ? ' active' : ''}"
       onclick="AppState.modulo.tabelas.filterRef='${s}';rerenderModule('tabelas')">${lbl} (${cnt})</button>`
@@ -4823,57 +4809,33 @@ function renderTabelas() {
   const renderTabelaRow = (tab) => {
     const expanded = st.expandida === tab.id;
     const inativa = tab.ativo === false;
-    const regraGerencia = DB.tabelasComissaoGerencia.find(g => g.tabela_id === tab.id);
 
-    const parcItems = tab.parcelas.map((pct, i) => {
-      const zero = pct === 0;
-      return `<div class="parc-item${zero ? ' zero' : ''}">
-        <div class="parc-n">${i + 1}ª parc.</div>
-        <div class="parc-pct">${zero ? '—' : (pct * 100).toFixed(2).replace(/\.?0+$/,'') + '%'}</div>
+    const totalVendedor = (tab.parcelas.reduce((a,p) => a+p, 0)).toFixed(4).replace(/\.?0+$/,'');
+    const linhaCompacta = (parcelas) => parcelas.filter(p => p !== 0).map(p => p.toFixed(4).replace(/\.?0+$/,'')).join(' · ');
+
+    // NOVO: estrutura real de Londrina — Consultor, Supervisor Treinee
+    // (vendas próprias) e Supervisor Treinee (override sobre a equipe),
+    // tudo num card só compacto, com divisórias internas
+    const tabSupervisorPropria = DB.tabelasSupervisor.find(t => t.id === tab.id && (t.unidade||'') === 'londrina');
+    const tabOverrideEquipe = DB.tabelasOverrideLider.find(t => t.tabela_id === tab.id && t.unidade === 'londrina');
+
+    const linhaFaixa = (label, cor, parcelas, corTotal) => {
+      if (!parcelas) return '';
+      const total = parcelas.reduce((a,p)=>a+p,0).toFixed(4).replace(/\.?0+$/,'');
+      return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:10px;font-weight:700;color:${cor};text-transform:uppercase">${label}</span>
+          <span style="font-size:12px;font-weight:800;font-family:var(--mono);color:${corTotal}">${total}%</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${linhaCompacta(parcelas)}</div>
       </div>`;
-    }).join('');
-    const totalVendedor = (tab.parcelas.reduce((a,p) => a+p, 0) * 100).toFixed(2).replace(/\.?0+$/,'');
+    };
 
-    // NOVO: comissão de gerência/supervisão, visível conforme o role de
-    // quem está olhando — gestor vê tudo, supervisor só a própria parte
-    let blocoGerencia = '';
-    if (regraGerencia && (isG || isSup)) {
-      const somaSemLider = (regraGerencia.semSupervisor.reduce((a,p)=>a+p,0)).toFixed(2).replace(/\.?0+$/,'');
-      const somaComLider = (regraGerencia.comSupervisor.reduce((a,p)=>a+p,0)).toFixed(2).replace(/\.?0+$/,'');
-      const linhaParc = (arr, cor) => arr.map((p,i) => `
-        <div style="flex:1;text-align:center">
-          <div style="font-size:8px;color:${cor}">${i+1}ª</div>
-          <div style="font-size:13px;font-weight:700;font-family:var(--mono)">${(p*100).toFixed(2).replace(/\.?0+$/,'')}%</div>
-        </div>`).join('');
-
-      blocoGerencia = `
-        <div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1.2px;text-transform:uppercase;margin:16px 0 8px">Comissão de gerência / supervisão (3 primeiras parcelas)</div>
-        ${isG ? `
-        <div style="background:var(--amber-dim);border:1px solid var(--amber-glow);border-radius:8px;padding:10px;margin-bottom:8px">
-          <div style="font-size:10px;font-weight:700;color:var(--amber);margin-bottom:2px">Sem líder de equipe</div>
-          <div style="font-size:9px;color:var(--text2);margin-bottom:6px">Gerente recebe sozinho, sobre toda a produção do vendedor</div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:10px;color:var(--text2);min-width:80px">Gerente:</span>
-            ${linhaParc(regraGerencia.semSupervisor, 'var(--text3)')}
-            <span style="font-size:11px;font-weight:800;margin-left:8px">= ${somaSemLider}%</span>
-          </div>
-        </div>` : ''}
-        <div style="background:var(--green-dim);border:1px solid var(--green-glow);border-radius:8px;padding:10px">
-          <div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:2px">Com líder de equipe</div>
-          <div style="font-size:9px;color:var(--text2);margin-bottom:6px">${isG ? 'Os dois recebem — gerente E supervisor(a), cada um com sua parte, sobre a mesma venda' : 'Sua comissão como líder de equipe sobre a venda do vendedor'}</div>
-          ${isG ? `
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
-            <span style="font-size:10px;color:var(--text2);min-width:80px">Gerente:</span>
-            ${linhaParc(regraGerencia.comSupervisor, 'var(--text3)')}
-            <span style="font-size:11px;font-weight:800;margin-left:8px">= ${somaComLider}%</span>
-          </div>` : ''}
-          <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:10px;color:var(--text2);min-width:80px">Supervisor(a):</span>
-            ${linhaParc(regraGerencia.comSupervisor, 'var(--text3)')}
-            <span style="font-size:11px;font-weight:800;margin-left:8px">= ${somaComLider}%</span>
-          </div>
-        </div>`;
-    }
+    const blocoComissao = `
+      ${linhaFaixa('Consultor', 'var(--text2)', tab.parcelas, 'var(--text)')}
+      ${tabSupervisorPropria ? linhaFaixa('Supervisor Treinee · vendas próprias', '#0C447C', tabSupervisorPropria.parcelas, '#0C447C') : ''}
+      ${tabOverrideEquipe ? linhaFaixa('Supervisor Treinee · override equipe', '#27500A', tabOverrideEquipe.parcelas, '#27500A').replace('border-bottom:1px solid var(--line)','border-bottom:none') : ''}
+    `;
 
     return `<div class="tabela-card"${inativa ? ' style="opacity:0.55"' : ''}>
       <div class="tabela-header" onclick="toggleTabela('${tab.id}')">
@@ -4887,9 +4849,7 @@ function renderTabelas() {
         </div>
       </div>
       <div class="tabela-body${expanded ? ' open' : ''}">
-        <div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px">Comissão do vendedor (10 parcelas) · total ${totalVendedor}%</div>
-        <div class="parc-grid">${parcItems}</div>
-        ${blocoGerencia}
+        ${blocoComissao}
         ${isGestorPuro ? `
         <div style="display:flex;gap:8px;margin-top:14px">
           <button class="btn btn-ghost btn-sm" onclick="editarTabela('${tab.id}','${tab.unidade||'brusque'}')">✎ Editar</button>
@@ -6306,6 +6266,71 @@ function renderFunil() {
   const projecaoMedia = (projecaoPorVolume + projecaoPorReuniao) / 2;
   const pctProjRealizada = projecaoMedia > 0 ? Math.min((valorVendasTotal/projecaoMedia)*100, 999) : 0;
 
+  // NOVO: funil em cascata + taxas de conversão — usa a MAIOR etapa que
+  // cada lead já alcançou (não só a etapa atual), então mesmo quem depois
+  // desqualificou ainda conta como "chegou até ali" no funil
+  function maiorEtapaIndice(l) {
+    const idxAtual = FUNIL_ETAPA_ORDEM.indexOf(l.etapa);
+    const idxHist = (l.historico || []).map(h => FUNIL_ETAPA_ORDEM.indexOf(h.etapa)).filter(i => i >= 0);
+    return Math.max(idxAtual, ...idxHist, -1);
+  }
+  const idxQualif = FUNIL_ETAPA_ORDEM.indexOf('qualificacao');
+  const idxAgend  = FUNIL_ETAPA_ORDEM.indexOf('agendamento');
+  const idxReuniaoFeita = FUNIL_ETAPA_ORDEM.indexOf('reuniaoFeita');
+  const idxReuniao2 = FUNIL_ETAPA_ORDEM.indexOf('reuniao2');
+
+  const leadsComEtapa = leadsVisiveisMes.map(l => ({ l, idx: maiorEtapaIndice(l) }));
+  const qtdLeadsCascata = leadsComEtapa.length;
+  const qtdQualifCascata = leadsComEtapa.filter(x => x.idx >= idxQualif).length;
+  const qtdAgendCascata  = leadsComEtapa.filter(x => x.idx >= idxAgend).length;
+  const qtdReuniaoCascata = leadsComEtapa.filter(x => x.idx >= idxReuniaoFeita).length;
+  const qtdReuniao2Cascata = leadsComEtapa.filter(x => x.idx >= idxReuniao2).length;
+
+  // NOVO: "Venda" conta pelo MÊS EM QUE FECHOU, não pelo mês em que o lead
+  // entrou — por isso busca em TODOS os leads (leadsVisiveis, sem filtro de
+  // criadoEm), olhando a data da etapa "venda" no histórico
+  const leadsVendidosNoPeriodo = leadsVisiveis.filter(l => {
+    if (!l.vendaId) return false;
+    const dataFecho = dataUltimaEtapaFunil(l, 'venda');
+    return dataFecho && (ehTotal || dataFecho.substring(0,7) === st.mesSel);
+  });
+  const qtdVendaCascata = leadsVendidosNoPeriodo.length;
+
+  const taxaComparecimento = qtdAgendCascata > 0 ? (qtdReuniaoCascata/qtdAgendCascata)*100 : 0;
+  // NOVO: taxa de fechamento agora é a partir da 2ª reunião — é o ponto a
+  // partir do qual existe chance real de venda
+  const taxaFechamento = qtdReuniao2Cascata > 0 ? (qtdVendaCascata/qtdReuniao2Cascata)*100 : 0;
+  const conversaoGeral = qtdLeadsCascata > 0 ? (qtdVendaCascata/qtdLeadsCascata)*100 : 0;
+
+  // NOVO: Vida útil do lead — duas métricas separadas, do cadastro até
+  // fechar E do primeiro contato até fechar (pediu as duas)
+  function calcularDias(campoInicio) {
+    return leadsVendidosNoPeriodo.map(l => {
+      const inicioStr = campoInicio === 'cadastro' ? l.criadoEm : l.primeiroContatoTs;
+      if (!inicioStr) return null;
+      const inicio = new Date(campoInicio === 'cadastro' ? inicioStr+'T00:00:00' : inicioStr);
+      const fimStr = dataUltimaEtapaFunil(l, 'venda');
+      const fim = fimStr ? new Date(fimStr+'T00:00:00') : null;
+      if (!fim) return null;
+      return Math.round((fim - inicio) / 86400000);
+    }).filter(d => d !== null && d >= 0);
+  }
+  const diasDesdeCadastro = calcularDias('cadastro');
+  const diasDesdeContato  = calcularDias('contato');
+  const media = arr => arr.length > 0 ? Math.round(arr.reduce((a,d)=>a+d,0)/arr.length) : null;
+  const vidaUtilCadastro = media(diasDesdeCadastro);
+  const vidaUtilContato  = media(diasDesdeContato);
+  const vidaUtilMin = diasDesdeCadastro.length > 0 ? Math.min(...diasDesdeCadastro) : null;
+  const vidaUtilMax = diasDesdeCadastro.length > 0 ? Math.max(...diasDesdeCadastro) : null;
+
+  // Distribuição por faixa (baseada no tempo desde o cadastro)
+  const faixasVidaUtil = [
+    ['0-7 dias', diasDesdeCadastro.filter(d => d <= 7).length],
+    ['8-15 dias', diasDesdeCadastro.filter(d => d >= 8 && d <= 15).length],
+    ['16-30 dias', diasDesdeCadastro.filter(d => d >= 16 && d <= 30).length],
+    ['+30 dias', diasDesdeCadastro.filter(d => d > 30).length],
+  ];
+
   const _leadsSemVendedor = DB.leadsFunil.filter(l => !l.vendedor && l.etapa !== 'venda' && l.etapa !== 'desqualificado').length;
   const vendorTabsFunil = isG ? `
   <div class="vendor-filter">
@@ -6441,57 +6466,116 @@ ${!isG ? `
   </div>
 </div>` : ''}
 
-<div class="card">
-  <div class="card-body">
-    <div class="form-divider" style="margin-bottom:14px">Metas do mês</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px">
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--text2);font-weight:600">Reuniões</span>
-          <span style="font-size:15px;font-weight:800;font-family:var(--mono)">${totalReunioes}/${metaReunioes}</span>
-        </div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(totalReunioes/metaReunioes*100,100)}%;background:var(--brand)"></div></div>
-      </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--text2);font-weight:600">Vendas</span>
-          <span style="font-size:15px;font-weight:800;font-family:var(--mono)">${totalVendas}/${metaVendas}</span>
-        </div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(totalVendas/metaVendas*100,100)}%;background:var(--brand)"></div></div>
-      </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--text2);font-weight:600">Ligações</span>
-          <span style="font-size:15px;font-weight:800;font-family:var(--mono)">${totalLigacoes}/${metaLigacoes}</span>
-        </div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(totalLigacoes/metaLigacoes*100,100)}%;background:var(--brand)"></div></div>
-        ${isG ? `<div style="margin-top:4px"><button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirEditarLigacoesFunil()">✏️ Corrigir registros</button></div>` : ''}
-      </div>
-    </div>
-  </div>
-</div>
-
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
   <div class="card" style="margin-bottom:0">
     <div class="card-body">
-      <div class="stat-label">Crédito prospectado</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${fmt(creditoProspectado)}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">meta: ${fmt(metaCredito)}</div>
+      <div class="stat-label">Reuniões · Vendas (mês)</div>
+      <div style="display:flex;gap:20px;margin-top:6px">
+        <div>
+          <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${totalReunioes}<span style="font-size:11px;color:var(--text3)">/${metaReunioes}</span></div>
+          <div class="progress-wrap" style="margin-top:4px;width:70px"><div class="progress-bar" style="width:${Math.min(totalReunioes/metaReunioes*100,100)}%;background:#EF9F27"></div></div>
+        </div>
+        <div>
+          <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${totalVendas}<span style="font-size:11px;color:var(--text3)">/${metaVendas}</span></div>
+          <div class="progress-wrap" style="margin-top:4px;width:70px"><div class="progress-bar" style="width:${Math.min(totalVendas/metaVendas*100,100)}%;background:var(--brand)"></div></div>
+        </div>
+      </div>
+      ${isG ? `<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirEditarLigacoesFunil()">✏️ Corrigir registros de ligação</button></div>` : ''}
     </div>
   </div>
   <div class="card" style="margin-bottom:0">
     <div class="card-body">
       <div class="stat-label">Ticket médio</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${fmt(ticketMedio)}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">${leadsAtivosMes.length} lead(s) ativo(s) · meta 200-300k</div>
+      <div style="font-size:17px;font-weight:800;font-family:var(--mono);margin-top:6px">${fmt(ticketMedio)}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">${leadsAtivosMes.length} lead(s) ativo(s)</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px">
+  <div class="card" style="margin-bottom:0">
+    <div class="card-body">
+      <div class="stat-label">Conversão geral</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${conversaoGeral.toFixed(1)}%</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">lead → venda</div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:0;${taxaComparecimento < 70 && qtdAgendCascata > 0 ? 'border:1px solid var(--brand)' : ''}">
+    <div class="card-body">
+      <div class="stat-label" style="${taxaComparecimento < 70 && qtdAgendCascata > 0 ? 'color:var(--brand)' : ''}">Taxa de comparecimento</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px;${taxaComparecimento < 70 && qtdAgendCascata > 0 ? 'color:var(--brand)' : ''}">${taxaComparecimento.toFixed(0)}%</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">agendou → compareceu</div>
     </div>
   </div>
   <div class="card" style="margin-bottom:0">
     <div class="card-body">
-      <div class="stat-label">Conversão tráfego</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${conversaoPagoReal.toFixed(1)}%</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">${vendasPago} de ${leadsPago.length} leads</div>
+      <div class="stat-label">Taxa de fechamento</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${taxaFechamento.toFixed(0)}%</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">2ª reunião → venda (com pagamento)</div>
     </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="stat-label" style="margin-bottom:12px">Funil em cascata — onde está o gargalo</div>
+    ${(() => {
+      const etapasCascata = [
+        ['Leads', qtdLeadsCascata, '#0C447C'],
+        ['Qualific.', qtdQualifCascata, '#0C447C'],
+        ['Agendado', qtdAgendCascata, '#EF9F27'],
+        ['Reunião', qtdReuniaoCascata, '#EF9F27'],
+        ['2ª Reunião', qtdReuniao2Cascata, '#C8392B'],
+        ['Venda', qtdVendaCascata, '#639922'],
+      ];
+      const maxQtd = Math.max(qtdLeadsCascata, 1);
+      return etapasCascata.map(([label, qtd, cor], i) => {
+        const larguraPct = Math.max((qtd/maxQtd)*100, qtd > 0 ? 6 : 2);
+        const anterior = i > 0 ? etapasCascata[i-1][1] : null;
+        const queda = anterior && anterior > 0 ? Math.round((1 - qtd/anterior)*100) : null;
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <div style="width:64px;font-size:10px;color:var(--text3);flex-shrink:0">${label}</div>
+          <div style="background:${cor};height:22px;border-radius:4px;width:${larguraPct}%;display:flex;align-items:center;padding-left:8px;color:#fff;font-size:11px;font-weight:700;white-space:nowrap;min-width:34px">
+            ${qtd}${queda != null && queda > 25 ? `<span style="opacity:0.75;margin-left:6px;font-weight:500">← queda de ${queda}%</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    })()}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="stat-label" style="margin-bottom:12px">Vida útil do lead — tempo até fechar</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px">
+      <div style="background:var(--ink3);border-radius:10px;padding:12px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase">Do cadastro até fechar</div>
+        <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:4px">${vidaUtilCadastro != null ? vidaUtilCadastro+' dias' : '—'}</div>
+      </div>
+      <div style="background:var(--ink3);border-radius:10px;padding:12px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase">Do 1º contato até fechar</div>
+        <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:4px">${vidaUtilContato != null ? vidaUtilContato+' dias' : '—'}</div>
+      </div>
+      <div style="background:var(--ink3);border-radius:10px;padding:12px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase">Mais rápido · Mais lento</div>
+        <div style="font-size:14px;font-weight:700;margin-top:6px">${vidaUtilMin != null ? vidaUtilMin+'d' : '—'} <span style="color:var(--text3);font-weight:400">·</span> ${vidaUtilMax != null ? vidaUtilMax+'d' : '—'}</div>
+      </div>
+    </div>
+    ${qtdVendaCascata > 0 ? `
+    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Distribuição por faixa de tempo (desde o cadastro)</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${(() => {
+        const maxFaixa = Math.max(...faixasVidaUtil.map(f => f[1]), 1);
+        const coresFaixa = ['#639922','#639922','#EF9F27','#C8392B'];
+        return faixasVidaUtil.map(([label, qtd], i) => {
+          const larguraPct = Math.max((qtd/maxFaixa)*100, qtd > 0 ? 8 : 2);
+          return `<div style="display:flex;align-items:center;gap:8px">
+            <div style="width:70px;font-size:10px;color:var(--text3);flex-shrink:0">${label}</div>
+            <div style="background:${coresFaixa[i]};height:18px;border-radius:4px;width:${larguraPct}%;display:flex;align-items:center;padding-left:6px;color:#fff;font-size:10px;font-weight:700;min-width:22px">${qtd}</div>
+          </div>`;
+        }).join('');
+      })()}
+    </div>` : `<div style="font-size:11px;color:var(--text3)">Sem vendas fechadas nesse período ainda</div>`}
   </div>
 </div>
 
