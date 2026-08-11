@@ -160,8 +160,7 @@ const Servicos = {
     let query = sb.from('vendas').select(`
       *,
       vendedor_info:vendedores!vendas_vendedor_id_fkey(id, nome, email),
-      cliente:clientes(id, nome, cpf, telefone),
-      tabela:tabelas_comissao(id, nome, ref, parcelas)
+      cliente:clientes(id, nome, cpf, telefone)
     `).order('dvenda', { ascending: false });
 
     if (filtros.vendedor_id) query = query.eq('vendedor_id', filtros.vendedor_id);
