@@ -6182,9 +6182,16 @@ function leadsVisiveisFunil() {
     return st.filtroVend ? base.filter(l => l.vendedor === st.filtroVend) : base;
   }
   // NOVO: supervisor/líder de equipe (ex: Paulo) vê os próprios leads +
-  // os leads de quem reporta a ele (a equipe toda), não só os dele
+  // os leads de quem reporta a ele (a equipe toda), não só os dele — e
+  // agora também pode filtrar por uma pessoa específica da própria equipe
   if (u.role === 'supervisor') {
     const idsEquipe = DB.vendedores.filter(v => v.liderId === u.id).map(v => v.id);
+    if (st.filtroVend) {
+      // só deixa filtrar por si mesmo ou por quem reporta a ele — não dá
+      // pra "escapar" digitando o id de outra pessoa fora da equipe
+      const filtroValido = st.filtroVend === u.id || idsEquipe.includes(st.filtroVend);
+      return filtroValido ? base.filter(l => l.vendedor === st.filtroVend) : [];
+    }
     return base.filter(l => l.vendedor === u.id || idsEquipe.includes(l.vendedor));
   }
   return base.filter(l => l.vendedor === u.id);
@@ -6220,6 +6227,7 @@ function melhorPerformanceFunil(excluirVendId, mes) {
 function renderFunil() {
   const u = AppState.user;
   const isG = (u.role === 'gestor' || u.role === 'adm');
+  const isSup = u.role === 'supervisor';
   const st = AppState.modulo.funil;
   if (!st.mesSel) st.mesSel = todayMes();
 
@@ -6338,12 +6346,22 @@ function renderFunil() {
   ];
 
   const _leadsSemVendedor = DB.leadsFunil.filter(l => !l.vendedor && l.etapa !== 'venda' && l.etapa !== 'desqualificado').length;
+  // NOVO: líder de equipe (Supervisor/Supervisor Treinee) também pode
+  // filtrar por vendedor — mas só entre os próprios liderados + ele mesmo,
+  // não o time inteiro da unidade (isso continua exclusivo do gestor)
+  const equipeDoLider = isSup ? [u, ...DB.vendedores.filter(v => v.liderId === u.id)] : [];
   const vendorTabsFunil = isG ? `
   <div class="vendor-filter">
     <select class="form-input vendor-filter-select" onchange="AppState.modulo.funil.filtroVend=this.value||null;rerenderModule('funil')">
       <option value=""${!st.filtroVend ? ' selected' : ''}>Todos os vendedores</option>
       <option value="__sem_vendedor__" style="color:var(--brand);font-weight:700"${st.filtroVend==='__sem_vendedor__' ? ' selected' : ''}>⚠ Não atribuído (${_leadsSemVendedor})</option>
       ${vendedoresNaUnidade().map(v => `<option value="${v.id}"${st.filtroVend === v.id ? ' selected' : ''}>${v.nome}</option>`).join('')}
+    </select>
+  </div>` : isSup ? `
+  <div class="vendor-filter">
+    <select class="form-input vendor-filter-select" onchange="AppState.modulo.funil.filtroVend=this.value||null;rerenderModule('funil')">
+      <option value=""${!st.filtroVend ? ' selected' : ''}>Toda a equipe</option>
+      ${equipeDoLider.map(v => `<option value="${v.id}"${st.filtroVend === v.id ? ' selected' : ''}>${v.nome}${v.id===u.id?' (eu)':''}</option>`).join('')}
     </select>
   </div>` : '';
 
