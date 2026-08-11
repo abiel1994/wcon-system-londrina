@@ -7173,6 +7173,7 @@ function renderTransferenciasUnidade() {
    MÓDULO: TREINAMENTOS — scripts e vídeos da equipe
    ═══════════════════════════════════════════════════════════════════════════ */
 const TREINAMENTO_CATEGORIAS = [
+  { key: 'sistema',      label: 'Sistema',      cor: '#791F1F', bg: '#FCEBEB' },
   { key: 'abordagem',    label: 'Abordagem',    cor: '#0C447C', bg: '#E6F1FB' },
   { key: 'qualificacao', label: 'Qualificação', cor: '#26215C', bg: '#EEEDFE' },
   { key: 'followup',     label: 'Follow-up',    cor: '#7A4A0A', bg: '#FFF8E8' },
