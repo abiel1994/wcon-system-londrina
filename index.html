@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WCON System — Mundo do Consórcio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile-responsive.css">
+  <link rel="stylesheet" href="print-fix.css">
+  </head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-split">
+
+    <!-- ESQUERDO — Marca + Globo -->
+    <div class="login-split-left">
+
+      <!-- Globo SVG de fundo -->
+      <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" viewBox="0 0 440 560" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <radialGradient id="bg-glow" cx="50%" cy="48%" r="45%">
+            <stop offset="0%" stop-color="#C8392B" stop-opacity="0.08"/>
+            <stop offset="100%" stop-color="#C8392B" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="220" cy="268" rx="185" ry="210" fill="url(#bg-glow)"/>
+        <circle cx="220" cy="268" r="165" fill="none" stroke="#C8392B" stroke-width="1" opacity="0.40"/>
+        <ellipse cx="220" cy="268" rx="165" ry="40"  fill="none" stroke="#ECEEF5" stroke-width="0.45" opacity="0.22"/>
+        <ellipse cx="220" cy="268" rx="165" ry="82"  fill="none" stroke="#ECEEF5" stroke-width="0.40" opacity="0.18"/>
+        <ellipse cx="220" cy="268" rx="165" ry="122" fill="none" stroke="#ECEEF5" stroke-width="0.35" opacity="0.15"/>
+        <ellipse cx="220" cy="215" rx="148" ry="36"  fill="none" stroke="#ECEEF5" stroke-width="0.30" opacity="0.13"/>
+        <ellipse cx="220" cy="320" rx="148" ry="36"  fill="none" stroke="#ECEEF5" stroke-width="0.30" opacity="0.13"/>
+        <ellipse cx="220" cy="165" rx="115" ry="27"  fill="none" stroke="#ECEEF5" stroke-width="0.25" opacity="0.10"/>
+        <ellipse cx="220" cy="372" rx="115" ry="27"  fill="none" stroke="#ECEEF5" stroke-width="0.25" opacity="0.10"/>
+        <line x1="220" y1="103" x2="220" y2="433" stroke="#ECEEF5" stroke-width="0.45" opacity="0.22"/>
+        <ellipse cx="220" cy="268" rx="42"  ry="165" fill="none" stroke="#ECEEF5" stroke-width="0.40" opacity="0.20"/>
+        <ellipse cx="220" cy="268" rx="85"  ry="165" fill="none" stroke="#ECEEF5" stroke-width="0.35" opacity="0.17"/>
+        <ellipse cx="220" cy="268" rx="125" ry="165" fill="none" stroke="#ECEEF5" stroke-width="0.30" opacity="0.14"/>
+        <ellipse cx="220" cy="268" rx="152" ry="165" fill="none" stroke="#ECEEF5" stroke-width="0.22" opacity="0.10"/>
+        <circle cx="220" cy="268" r="3"   fill="#C8392B" opacity="0.9"/>
+        <circle cx="258" cy="235" r="2"   fill="#C8392B" opacity="0.75"/>
+        <circle cx="182" cy="250" r="2"   fill="#ECEEF5" opacity="0.55"/>
+        <circle cx="266" cy="278" r="1.8" fill="#ECEEF5" opacity="0.50"/>
+        <circle cx="178" cy="288" r="1.8" fill="#ECEEF5" opacity="0.50"/>
+        <circle cx="232" cy="310" r="1.8" fill="#ECEEF5" opacity="0.48"/>
+        <circle cx="210" cy="320" r="1.8" fill="#ECEEF5" opacity="0.45"/>
+        <circle cx="225" cy="155" r="1.5" fill="#ECEEF5" opacity="0.40"/>
+        <circle cx="225" cy="380" r="1.5" fill="#ECEEF5" opacity="0.38"/>
+        <circle cx="355" cy="268" r="1.5" fill="#ECEEF5" opacity="0.32"/>
+        <circle cx="85"  cy="268" r="1.5" fill="#ECEEF5" opacity="0.32"/>
+        <circle cx="310" cy="215" r="1.5" fill="#C8392B" opacity="0.50"/>
+        <line x1="220" y1="268" x2="258" y2="235" stroke="#C8392B" stroke-width="0.7" opacity="0.45"/>
+        <line x1="220" y1="268" x2="182" y2="250" stroke="#C8392B" stroke-width="0.7" opacity="0.40"/>
+        <line x1="220" y1="268" x2="266" y2="278" stroke="#ECEEF5" stroke-width="0.5" opacity="0.28"/>
+        <line x1="220" y1="268" x2="178" y2="288" stroke="#ECEEF5" stroke-width="0.5" opacity="0.28"/>
+        <line x1="220" y1="268" x2="232" y2="310" stroke="#ECEEF5" stroke-width="0.5" opacity="0.25"/>
+        <line x1="220" y1="268" x2="210" y2="320" stroke="#ECEEF5" stroke-width="0.5" opacity="0.25"/>
+        <line x1="220" y1="268" x2="225" y2="155" stroke="#ECEEF5" stroke-width="0.4" opacity="0.20"/>
+        <line x1="220" y1="268" x2="225" y2="380" stroke="#ECEEF5" stroke-width="0.4" opacity="0.20"/>
+        <line x1="258" y1="235" x2="310" y2="215" stroke="#ECEEF5" stroke-width="0.4" opacity="0.18"/>
+        <line x1="258" y1="235" x2="266" y2="278" stroke="#ECEEF5" stroke-width="0.4" opacity="0.18"/>
+        <line x1="182" y1="250" x2="178" y2="288" stroke="#ECEEF5" stroke-width="0.4" opacity="0.18"/>
+        <circle cx="220" cy="268" r="8"  fill="none" stroke="#C8392B" stroke-width="0.8" opacity="0.30"/>
+        <circle cx="220" cy="268" r="15" fill="none" stroke="#C8392B" stroke-width="0.4" opacity="0.15"/>
+      </svg>
+
+      <div class="login-split-top">
+        <div class="login-split-logo">
+          <span style="color:#ECEEF5;letter-spacing:-0.04em">W</span><span style="color:#C8392B;letter-spacing:0.04em">CON</span>
+        </div>
+      </div>
+      <div class="login-split-mid">
+        <div class="login-split-headline">O ecossistema<br><strong>completo do<br>consórcio.</strong></div>
+        <div class="login-pillars">
+          <div class="login-pillar"><span class="lp-n">01</span><div><div class="lp-name">Estrutura</div><div class="lp-desc">Operação organizada do zero</div></div></div>
+          <div class="login-pillar"><span class="lp-n">02</span><div><div class="lp-name">Estratégia</div><div class="lp-desc">Metodologia que dobra a produção</div></div></div>
+          <div class="login-pillar"><span class="lp-n">03</span><div><div class="lp-name">Escala</div><div class="lp-desc">Crescimento sustentável</div></div></div>
+        </div>
+      </div>
+      <div class="login-split-foot">WCON · Worldcon · Mundo do Consórcio</div>
+    </div>
+
+    <!-- DIREITO — Formulário -->
+    <div class="login-split-right">
+      <div class="login-split-form-logo">
+        <span style="color:#1A1D24;letter-spacing:-0.04em">W</span><span style="color:#C8392B;letter-spacing:0.04em">CON</span>
+      </div>
+      <div class="login-split-form-sub">Sistema de Gestão</div>
+      <label class="form-label">E-mail</label>
+      <input type="email" class="form-input" id="lu" placeholder="seuemail@exemplo.com" autocomplete="username">
+      <label class="form-label">Senha</label>
+      <input type="password" class="form-input" id="lp" placeholder="••••••••" autocomplete="current-password">
+      <button class="btn-login" onclick="doLogin()">Entrar no sistema →</button>
+      <div id="login-error" style="display:none;margin-top:10px;font-size:12px;color:#C8392B;font-family:'DM Mono',monospace"></div>
+      <!-- Esqueci minha senha -->
+<p style="text-align:center; margin-top:16px;">
+  <a href="#" id="link-esqueci-senha" style="font-size:13px; color:#888; text-decoration:none;">Esqueci minha senha</a>
+</p>
+
+<!-- Modal recuperação de senha -->
+<div id="modal-esqueci-senha" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#1A1A1A; border:1px solid #2A2A2A; border-radius:16px; padding:32px 28px; width:100%; max-width:360px; margin:0 20px;">
+    <h3 style="font-size:18px; font-weight:700; color:#fff; margin:0 0 8px;">Redefinir senha</h3>
+    <p style="font-size:13px; color:#888; margin:0 0 24px;">Digite seu e-mail e enviaremos um link para criar uma nova senha.</p>
+    <label style="font-size:11px; font-weight:600; letter-spacing:1px; color:#888; display:block; margin-bottom:6px;">E-MAIL</label>
+    <input type="email" id="input-recuperar-email" placeholder="seuemail@exemplo.com" style="width:100%; background:#252525; border:1px solid #333; border-radius:8px; padding:12px 14px; font-size:15px; color:#fff; font-family:'Poppins',sans-serif; outline:none; margin-bottom:16px;">
+    <button id="btn-enviar-recuperacao" style="width:100%; background:#C0392B; color:#fff; border:none; border-radius:8px; padding:14px; font-size:14px; font-weight:600; font-family:'Poppins',sans-serif; cursor:pointer;">Enviar link de recuperação</button>
+    <p id="msg-recuperacao" style="font-size:13px; text-align:center; margin-top:12px; min-height:20px;"></p>
+    <button id="btn-fechar-recuperacao" style="width:100%; background:transparent; color:#666; border:none; padding:10px; font-size:13px; font-family:'Poppins',sans-serif; cursor:pointer;">Cancelar</button>
+  </div>
+</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PRIMEIRO ACESSO — definir senha definitiva -->
+<div id="primeiro-acesso" class="hidden">
+  <div class="login-split">
+    <div class="login-split-right" style="margin:auto">
+      <div class="login-split-form-logo">
+        <span style="color:#1A1D24;letter-spacing:-0.04em">W</span><span style="color:#C8392B;letter-spacing:0.04em">CON</span>
+      </div>
+      <div class="login-split-form-sub">Bem-vindo(a)! Defina sua senha de acesso</div>
+      <label class="form-label">Nova senha (mín. 6 caracteres)</label>
+      <input type="password" class="form-input" id="pa-senha1" placeholder="••••••••" autocomplete="new-password">
+      <label class="form-label">Confirmar senha</label>
+      <input type="password" class="form-input" id="pa-senha2" placeholder="••••••••" autocomplete="new-password">
+      <button class="btn-login" onclick="salvarNovaSenha()">Salvar senha e entrar →</button>
+      <div id="pa-error" style="display:none;margin-top:10px;font-size:12px;color:#C8392B;font-family:'DM Mono',monospace"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app">
+  <header id="header">
+    <button id="btn-toggle-sb" aria-label="Menu">☰</button>
+    <div class="header-brand"><span style="color:#ECEEF5;letter-spacing:-0.04em">W</span><span class="accent" style="color:var(--brand);letter-spacing:0.04em">CON</span></div>
+    <div class="header-search">
+      <span class="search-ic">⌕</span>
+      <input type="text" placeholder="Pesquisar clientes, contratos..." id="global-search">
+    </div>
+    <div class="header-spacer"></div>
+    <div class="header-actions">
+      <div id="unidade-switch-wrap"></div>
+      <div class="header-notif" id="btn-sino" title="Notificações" onclick="abrirNotificacoes()" style="cursor:pointer">
+        🔔
+        <span class="badge" id="notif-badge" style="display:none">0</span>
+      </div>
+      <!-- Toggle Tema -->
+      <div class="header-notif" id="btn-theme" title="Alternar tema" onclick="toggleTheme()" style="cursor:pointer;font-size:16px">🌙</div>
+      <div class="header-user" onclick="Router.navigate('configuracoes')">
+        <div class="header-user-avatar" id="header-user-avatar">AD</div>
+        <div class="header-user-info">
+          <span class="header-user-name" id="header-user-name">Usuário</span>
+          <span class="header-user-role" id="header-user-role">—</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div id="body">
+    <nav id="sidebar">
+      <div class="sb-nav" id="sidebar-nav"></div>
+      <div class="sb-footer">
+        <button class="btn-logout" onclick="doLogout()">↩ Sair do sistema</button>
+      </div>
+    </nav>
+    <div id="mobile-overlay"></div>
+    <main id="main-content">
+      <section class="module" id="mod-dashboard"></section>
+      <section class="module" id="mod-vendedores"></section>
+      <section class="module" id="mod-clientes"></section>
+      <section class="module" id="mod-relatorio"></section>
+      <section class="module" id="mod-comissao"></section>
+      <section class="module" id="mod-comissaoLideranca"></section>
+      <section class="module" id="mod-inadimplencia"></section>
+      <section class="module" id="mod-estornos"></section>
+      <section class="module" id="mod-trabalho"></section>
+      <section class="module" id="mod-funil"></section>
+      <section class="module" id="mod-painelExecutivo"></section>
+      <section class="module" id="mod-agendaFunil"></section>
+      <section class="module" id="mod-leadsPainel"></section>
+      <section class="module" id="mod-tabelas"></section>
+      <section class="module" id="mod-configuracoes"></section>
+      <section class="module" id="mod-treinamentos"></section>
+      <section class="module" id="mod-metaDiaria"></section>
+      <section class="module" id="mod-transferenciasUnidade"></section>
+    </main>
+  </div>
+</div>
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<!-- Conexão com banco -->
+<script src="supabase.js"></script>
+<!-- App principal -->
+<script src="app.js"></script>
+  <script src="mobile-nav.js"></script>
+</body>
+</html>
