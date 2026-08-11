@@ -6298,21 +6298,28 @@ function renderFunil() {
   const idxQualif = FUNIL_ETAPA_ORDEM.indexOf('qualificacao');
   const idxAgend  = FUNIL_ETAPA_ORDEM.indexOf('agendamento');
   const idxReuniaoFeita = FUNIL_ETAPA_ORDEM.indexOf('reuniaoFeita');
-  const idxVenda  = FUNIL_ETAPA_ORDEM.indexOf('venda');
+  const idxReuniao2 = FUNIL_ETAPA_ORDEM.indexOf('reuniao2');
 
   const leadsComEtapa = leadsVisiveisMes.map(l => ({ l, idx: maiorEtapaIndice(l) }));
   const qtdLeadsCascata = leadsComEtapa.length;
   const qtdQualifCascata = leadsComEtapa.filter(x => x.idx >= idxQualif).length;
   const qtdAgendCascata  = leadsComEtapa.filter(x => x.idx >= idxAgend).length;
   const qtdReuniaoCascata = leadsComEtapa.filter(x => x.idx >= idxReuniaoFeita).length;
-  const qtdVendaCascata  = leadsComEtapa.filter(x => x.idx >= idxVenda).length;
+  const qtdReuniao2Cascata = leadsComEtapa.filter(x => x.idx >= idxReuniao2).length;
+  // NOVO: "Venda" só conta quem tem venda DE VERDADE registrada (vendaId
+  // vinculado ao relatório de vendas, com pagamento) — não só quem mudou
+  // de etapa manualmente no funil pra "venda"
+  const qtdVendaCascata  = leadsComEtapa.filter(x => !!x.l.vendaId).length;
 
   const taxaComparecimento = qtdAgendCascata > 0 ? (qtdReuniaoCascata/qtdAgendCascata)*100 : 0;
-  const taxaFechamento = qtdReuniaoCascata > 0 ? (qtdVendaCascata/qtdReuniaoCascata)*100 : 0;
+  // NOVO: taxa de fechamento agora é a partir da 2ª reunião — é o ponto a
+  // partir do qual existe chance real de venda
+  const taxaFechamento = qtdReuniao2Cascata > 0 ? (qtdVendaCascata/qtdReuniao2Cascata)*100 : 0;
   const conversaoGeral = qtdLeadsCascata > 0 ? (qtdVendaCascata/qtdLeadsCascata)*100 : 0;
 
   // Ciclo médio: dias entre o primeiro contato e a venda, pros leads vendidos no período
-  const ciclosDias = vendasDoMes.map(l => {
+  const ciclosDias = leadsComEtapa.filter(x => !!x.l.vendaId).map(x => {
+    const l = x.l;
     const inicio = l.primeiroContatoTs ? new Date(l.primeiroContatoTs) : (l.criadoEm ? new Date(l.criadoEm+'T00:00:00') : null);
     const fimStr = dataUltimaEtapaFunil(l, 'venda');
     const fim = fimStr ? new Date(fimStr+'T00:00:00') : null;
@@ -6504,7 +6511,7 @@ ${!isG ? `
     <div class="card-body">
       <div class="stat-label">Taxa de fechamento</div>
       <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${taxaFechamento.toFixed(0)}%</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">reunião → venda</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">2ª reunião → venda (com pagamento)</div>
     </div>
   </div>
 </div>
@@ -6517,7 +6524,8 @@ ${!isG ? `
         ['Leads', qtdLeadsCascata, '#0C447C'],
         ['Qualific.', qtdQualifCascata, '#0C447C'],
         ['Agendado', qtdAgendCascata, '#EF9F27'],
-        ['Reunião', qtdReuniaoCascata, '#C8392B'],
+        ['Reunião', qtdReuniaoCascata, '#EF9F27'],
+        ['2ª Reunião', qtdReuniao2Cascata, '#C8392B'],
         ['Venda', qtdVendaCascata, '#639922'],
       ];
       const maxQtd = Math.max(qtdLeadsCascata, 1);
