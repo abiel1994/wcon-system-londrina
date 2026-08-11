@@ -7830,7 +7830,11 @@ function abrirDetalheTreinamento(id) {
         ? `<div style="border-radius:10px;overflow:hidden;background:#000"><iframe src="${embed.src}" style="width:100%;aspect-ratio:16/9;border:0" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>`
         : `<div class="alert alert-amber">Não consegui identificar esse link de vídeo.</div>`)
     : t.tipo === 'html'
-    ? `<div style="border-radius:10px;overflow:hidden;border:1px solid var(--line)"><iframe id="mtv-iframe-html" style="width:100%;height:75vh;border:0;display:block" sandbox="allow-scripts allow-same-origin"></iframe></div>`
+    ? `<div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-ghost btn-sm" onclick="telaCheiaTreinamento()">⛶ Tela cheia</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirTreinamentoNovaAba('${t.id}')">↗ Abrir em nova aba</button>
+      </div>
+      <div style="border-radius:10px;overflow:hidden;border:1px solid var(--line)"><iframe id="mtv-iframe-html" style="width:100%;height:75vh;border:0;display:block" sandbox="allow-scripts allow-same-origin" allowfullscreen></iframe></div>`
     : `<div style="background:var(--ink3);border-radius:10px;padding:16px;font-size:13px;line-height:1.7;white-space:pre-wrap">${t.conteudo}</div>`;
 
   document.getElementById('mtv-conteudo').innerHTML = `
@@ -7848,6 +7852,27 @@ function abrirDetalheTreinamento(id) {
     const iframe = document.getElementById('mtv-iframe-html');
     if (iframe) iframe.srcdoc = t.conteudo || '<p style="font-family:sans-serif;padding:20px">Conteúdo vazio.</p>';
   }
+}
+
+// NOVO: pede pro navegador colocar o iframe (o conteúdo do treinamento) em
+// tela cheia de verdade — funciona igual o F11, mas só daquele elemento
+function telaCheiaTreinamento() {
+  const iframe = document.getElementById('mtv-iframe-html');
+  if (!iframe) return;
+  if (iframe.requestFullscreen) iframe.requestFullscreen();
+  else if (iframe.webkitRequestFullscreen) iframe.webkitRequestFullscreen();
+  else if (iframe.msRequestFullscreen) iframe.msRequestFullscreen();
+  else Dialog.alert('Não suportado', ['Seu navegador não suporta tela cheia. Tente "Abrir em nova aba" em vez disso.']);
+}
+
+// NOVO: abre o conteúdo numa aba nova do navegador — útil em celular (onde
+// tela cheia de iframe às vezes não funciona bem) ou quem prefere assim
+function abrirTreinamentoNovaAba(id) {
+  const t = DB.treinamentos.find(x => x.id === id);
+  if (!t || !t.conteudo) return;
+  const blob = new Blob([t.conteudo], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
 }
 
 async function excluirTreinamentoUI(id) {
