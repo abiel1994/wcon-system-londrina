@@ -6306,10 +6306,16 @@ function renderFunil() {
   const qtdAgendCascata  = leadsComEtapa.filter(x => x.idx >= idxAgend).length;
   const qtdReuniaoCascata = leadsComEtapa.filter(x => x.idx >= idxReuniaoFeita).length;
   const qtdReuniao2Cascata = leadsComEtapa.filter(x => x.idx >= idxReuniao2).length;
-  // NOVO: "Venda" só conta quem tem venda DE VERDADE registrada (vendaId
-  // vinculado ao relatório de vendas, com pagamento) — não só quem mudou
-  // de etapa manualmente no funil pra "venda"
-  const qtdVendaCascata  = leadsComEtapa.filter(x => !!x.l.vendaId).length;
+
+  // NOVO: "Venda" conta pelo MÊS EM QUE FECHOU, não pelo mês em que o lead
+  // entrou — por isso busca em TODOS os leads (leadsVisiveis, sem filtro de
+  // criadoEm), olhando a data da etapa "venda" no histórico
+  const leadsVendidosNoPeriodo = leadsVisiveis.filter(l => {
+    if (!l.vendaId) return false;
+    const dataFecho = dataUltimaEtapaFunil(l, 'venda');
+    return dataFecho && (ehTotal || dataFecho.substring(0,7) === st.mesSel);
+  });
+  const qtdVendaCascata = leadsVendidosNoPeriodo.length;
 
   const taxaComparecimento = qtdAgendCascata > 0 ? (qtdReuniaoCascata/qtdAgendCascata)*100 : 0;
   // NOVO: taxa de fechamento agora é a partir da 2ª reunião — é o ponto a
@@ -6317,16 +6323,34 @@ function renderFunil() {
   const taxaFechamento = qtdReuniao2Cascata > 0 ? (qtdVendaCascata/qtdReuniao2Cascata)*100 : 0;
   const conversaoGeral = qtdLeadsCascata > 0 ? (qtdVendaCascata/qtdLeadsCascata)*100 : 0;
 
-  // Ciclo médio: dias entre o primeiro contato e a venda, pros leads vendidos no período
-  const ciclosDias = leadsComEtapa.filter(x => !!x.l.vendaId).map(x => {
-    const l = x.l;
-    const inicio = l.primeiroContatoTs ? new Date(l.primeiroContatoTs) : (l.criadoEm ? new Date(l.criadoEm+'T00:00:00') : null);
-    const fimStr = dataUltimaEtapaFunil(l, 'venda');
-    const fim = fimStr ? new Date(fimStr+'T00:00:00') : null;
-    if (!inicio || !fim) return null;
-    return Math.round((fim - inicio) / 86400000);
-  }).filter(d => d !== null && d >= 0);
-  const cicloMedio = ciclosDias.length > 0 ? Math.round(ciclosDias.reduce((a,d)=>a+d,0)/ciclosDias.length) : null;
+  // NOVO: Vida útil do lead — duas métricas separadas, do cadastro até
+  // fechar E do primeiro contato até fechar (pediu as duas)
+  function calcularDias(campoInicio) {
+    return leadsVendidosNoPeriodo.map(l => {
+      const inicioStr = campoInicio === 'cadastro' ? l.criadoEm : l.primeiroContatoTs;
+      if (!inicioStr) return null;
+      const inicio = new Date(campoInicio === 'cadastro' ? inicioStr+'T00:00:00' : inicioStr);
+      const fimStr = dataUltimaEtapaFunil(l, 'venda');
+      const fim = fimStr ? new Date(fimStr+'T00:00:00') : null;
+      if (!fim) return null;
+      return Math.round((fim - inicio) / 86400000);
+    }).filter(d => d !== null && d >= 0);
+  }
+  const diasDesdeCadastro = calcularDias('cadastro');
+  const diasDesdeContato  = calcularDias('contato');
+  const media = arr => arr.length > 0 ? Math.round(arr.reduce((a,d)=>a+d,0)/arr.length) : null;
+  const vidaUtilCadastro = media(diasDesdeCadastro);
+  const vidaUtilContato  = media(diasDesdeContato);
+  const vidaUtilMin = diasDesdeCadastro.length > 0 ? Math.min(...diasDesdeCadastro) : null;
+  const vidaUtilMax = diasDesdeCadastro.length > 0 ? Math.max(...diasDesdeCadastro) : null;
+
+  // Distribuição por faixa (baseada no tempo desde o cadastro)
+  const faixasVidaUtil = [
+    ['0-7 dias', diasDesdeCadastro.filter(d => d <= 7).length],
+    ['8-15 dias', diasDesdeCadastro.filter(d => d >= 8 && d <= 15).length],
+    ['16-30 dias', diasDesdeCadastro.filter(d => d >= 16 && d <= 30).length],
+    ['+30 dias', diasDesdeCadastro.filter(d => d > 30).length],
+  ];
 
   const _leadsSemVendedor = DB.leadsFunil.filter(l => !l.vendedor && l.etapa !== 'venda' && l.etapa !== 'desqualificado').length;
   const vendorTabsFunil = isG ? `
@@ -6482,11 +6506,8 @@ ${!isG ? `
   </div>
   <div class="card" style="margin-bottom:0">
     <div class="card-body">
-      <div class="stat-label">Ticket médio · Ciclo médio</div>
-      <div style="display:flex;gap:20px;margin-top:6px">
-        <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${fmt(ticketMedio)}</div>
-        <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${cicloMedio != null ? cicloMedio+' dias' : '—'}</div>
-      </div>
+      <div class="stat-label">Ticket médio</div>
+      <div style="font-size:17px;font-weight:800;font-family:var(--mono);margin-top:6px">${fmt(ticketMedio)}</div>
       <div style="font-size:11px;color:var(--text3);margin-top:6px">${leadsAtivosMes.length} lead(s) ativo(s)</div>
     </div>
   </div>
@@ -6541,6 +6562,41 @@ ${!isG ? `
         </div>`;
       }).join('');
     })()}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="stat-label" style="margin-bottom:12px">Vida útil do lead — tempo até fechar</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px">
+      <div style="background:var(--ink3);border-radius:10px;padding:12px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase">Do cadastro até fechar</div>
+        <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:4px">${vidaUtilCadastro != null ? vidaUtilCadastro+' dias' : '—'}</div>
+      </div>
+      <div style="background:var(--ink3);border-radius:10px;padding:12px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase">Do 1º contato até fechar</div>
+        <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:4px">${vidaUtilContato != null ? vidaUtilContato+' dias' : '—'}</div>
+      </div>
+      <div style="background:var(--ink3);border-radius:10px;padding:12px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase">Mais rápido · Mais lento</div>
+        <div style="font-size:14px;font-weight:700;margin-top:6px">${vidaUtilMin != null ? vidaUtilMin+'d' : '—'} <span style="color:var(--text3);font-weight:400">·</span> ${vidaUtilMax != null ? vidaUtilMax+'d' : '—'}</div>
+      </div>
+    </div>
+    ${qtdVendaCascata > 0 ? `
+    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Distribuição por faixa de tempo (desde o cadastro)</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${(() => {
+        const maxFaixa = Math.max(...faixasVidaUtil.map(f => f[1]), 1);
+        const coresFaixa = ['#639922','#639922','#EF9F27','#C8392B'];
+        return faixasVidaUtil.map(([label, qtd], i) => {
+          const larguraPct = Math.max((qtd/maxFaixa)*100, qtd > 0 ? 8 : 2);
+          return `<div style="display:flex;align-items:center;gap:8px">
+            <div style="width:70px;font-size:10px;color:var(--text3);flex-shrink:0">${label}</div>
+            <div style="background:${coresFaixa[i]};height:18px;border-radius:4px;width:${larguraPct}%;display:flex;align-items:center;padding-left:6px;color:#fff;font-size:10px;font-weight:700;min-width:22px">${qtd}</div>
+          </div>`;
+        }).join('');
+      })()}
+    </div>` : `<div style="font-size:11px;color:var(--text3)">Sem vendas fechadas nesse período ainda</div>`}
   </div>
 </div>
 
