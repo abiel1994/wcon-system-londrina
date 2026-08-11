@@ -2512,7 +2512,7 @@ function previewComissaoCliente() {
     </div>
     <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
       <thead><tr>${['#','Venc. cliente','Pgto comissão','Valor','%'].map(h=>`<th style="padding:5px 10px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;background:var(--ink3);text-align:left">${h}</th>`).join('')}</tr></thead>
-      <tbody>${ativas.map(p=>`<tr><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text3)">${p.n}ª</td><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text2)">${fmtDate(p.dataVencCliente)}</td><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--brand)">${fmtDate(p.dataPgto)}</td><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--brand)">${fmt(p.valor)}</td><td style="padding:5px 10px;font-family:var(--mono);font-size:10px;color:var(--text3)">${p.pct*100}%</td></tr>`).join('')}</tbody>
+      <tbody>${ativas.map(p=>`<tr><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text3)">${p.n}ª</td><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text2)">${fmtDate(p.dataVencCliente)}</td><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--brand)">${fmtDate(p.dataPgto)}</td><td style="padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--brand)">${fmt(p.valor)}</td><td style="padding:5px 10px;font-family:var(--mono);font-size:10px;color:var(--text3)">${p.pct}%</td></tr>`).join('')}</tbody>
     </table></div>`;
 }
 
@@ -3137,7 +3137,7 @@ function previewComissao() {
     <td style="font-family:var(--mono);font-size:11px;color:var(--text2);padding:6px 10px">${fmtDate(p.dataVencCliente)}</td>
     <td style="font-family:var(--mono);font-size:11px;color:var(--gold);padding:6px 10px">${fmtDate(p.dataPgto)}</td>
     <td style="font-family:var(--mono);color:var(--gold);padding:6px 10px">${fmt(p.valor)}</td>
-    <td style="font-family:var(--mono);font-size:10px;color:var(--text3);padding:6px 10px">${p.pct * 100}%</td>
+    <td style="font-family:var(--mono);font-size:10px;color:var(--text3);padding:6px 10px">${p.pct}%</td>
   </tr>`).join('');
   prev.innerHTML = `
   <div style="padding:8px 12px;background:var(--ink4);border-bottom:1px solid var(--line);font-size:11px;font-family:var(--mono);display:flex;justify-content:space-between">
@@ -3335,7 +3335,7 @@ function verVendaDetalhe(id) {
           <td class="td-mono">${fmtDate(p.dataVencCliente)}</td>
           <td class="td-mono" style="color:var(--gold)">${fmtDate(p.dataPgto)}</td>
           <td class="td-mono" style="color:var(--gold)">${fmt(p.valor)}</td>
-          <td class="td-mono">${p.pct * 100}%</td>
+          <td class="td-mono">${p.pct}%</td>
           <td><span class="badge ${badge}" style="font-size:9px">${lbl}</span></td>
         </tr>`;
       }).join('')}</tbody>
@@ -3460,7 +3460,7 @@ function renderComissao() {
       <td class="td-mono" style="color:var(--text2)">${fmtDate(p.dataVencCliente)}</td>
       <td class="td-mono" style="color:var(--brand)">${fmtDate(p.dataPgto)}</td>
       <td class="td-mono" style="color:var(--green);font-weight:600">${fmt(p.valor)}</td>
-      <td class="td-mono" style="color:var(--text3)">${(p.pct*100).toFixed(2)}%</td>
+      <td class="td-mono" style="color:var(--text3)">${p.pct.toFixed(2)}%</td>
     </tr>`).join('');
 
     const rowsRec = recorrencia.map(p => `<tr>
@@ -3471,7 +3471,7 @@ function renderComissao() {
       <td class="td-mono" style="color:var(--text2)">${fmtDate(p.dataVencCliente)}</td>
       <td class="td-mono" style="color:var(--brand)">${fmtDate(p.dataPgto)}</td>
       <td class="td-mono" style="color:var(--blue);font-weight:600">${fmt(p.valor)}</td>
-      <td class="td-mono" style="color:var(--text3)">${(p.pct*100).toFixed(2)}%</td>
+      <td class="td-mono" style="color:var(--text3)">${p.pct.toFixed(2)}%</td>
     </tr>`).join('');
 
     const rowsEst = estornosDinamicos.map(e => `<tr style="background:rgba(200,57,43,0.03)">
@@ -5093,7 +5093,7 @@ function simularTabela() {
         <td class="td-mono">${fmtDate(p.dataVencCliente)}</td>
         <td class="td-mono" style="color:var(--gold)">${fmtDate(p.dataPgto)}</td>
         <td class="td-mono" style="color:var(--gold)">${fmt(p.valor)}</td>
-        <td class="td-mono">${p.pct * 100}%</td>
+        <td class="td-mono">${p.pct}%</td>
       </tr>`).join('')}</tbody>
     </table></div>`;
 }
@@ -5357,7 +5357,7 @@ function renderRemuneracao() {
     <td class="td-mono" style="color:var(--brand)">${fmtDate(p.dataPgto)}</td>
     <td><span class="badge ${p.ref === 'REF 3' ? 'badge-gold' : 'badge-blue'}">${p.ref}</span></td>
     <td class="td-mono" style="color:var(--green);font-weight:600">${fmt(p.valor)}</td>
-    <td class="td-mono" style="color:var(--text3)">${(p.pct*100).toFixed(1)}%</td>
+    <td class="td-mono" style="color:var(--text3)">${p.pct.toFixed(1)}%</td>
   </tr>`).join('');
 
   const rowsRec = recorrencia.map(p => `<tr>
@@ -5369,7 +5369,7 @@ function renderRemuneracao() {
     <td class="td-mono" style="color:var(--brand)">${fmtDate(p.dataPgto)}</td>
     <td><span class="badge ${p.ref === 'REF 3' ? 'badge-gold' : 'badge-blue'}">${p.ref}</span></td>
     <td class="td-mono" style="color:var(--blue);font-weight:600">${fmt(p.valor)}</td>
-    <td class="td-mono" style="color:var(--text3)">${(p.pct*100).toFixed(1)}%</td>
+    <td class="td-mono" style="color:var(--text3)">${p.pct.toFixed(1)}%</td>
   </tr>`).join('');
 
   const tabelaHTML = (producao.length > 0 || recorrencia.length > 0) ? `
