@@ -4811,7 +4811,13 @@ function renderTabelas() {
     const inativa = tab.ativo === false;
 
     const totalVendedor = (tab.parcelas.reduce((a,p) => a+p, 0)).toFixed(4).replace(/\.?0+$/,'');
-    const linhaCompacta = (parcelas) => parcelas.filter(p => p !== 0).map(p => p.toFixed(4).replace(/\.?0+$/,'')).join(' · ');
+    const linhaCompacta = (parcelas) => parcelas.map((p,i) => {
+      if (p === 0) return '';
+      return `<div style="text-align:center;min-width:32px">
+        <div style="font-size:8px;color:var(--text3)">${i+1}ª</div>
+        <div style="font-size:11px;font-weight:700;font-family:var(--mono);color:var(--text)">${p.toFixed(4).replace(/\.?0+$/,'')}%</div>
+      </div>`;
+    }).join('');
 
     // NOVO: estrutura real de Londrina — Consultor, Supervisor Treinee
     // (vendas próprias) e Supervisor Treinee (override sobre a equipe),
@@ -4823,11 +4829,11 @@ function renderTabelas() {
       if (!parcelas) return '';
       const total = parcelas.reduce((a,p)=>a+p,0).toFixed(4).replace(/\.?0+$/,'');
       return `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:10px;font-weight:700;color:${cor};text-transform:uppercase">${label}</span>
           <span style="font-size:12px;font-weight:800;font-family:var(--mono);color:${corTotal}">${total}%</span>
         </div>
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${linhaCompacta(parcelas)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${linhaCompacta(parcelas)}</div>
       </div>`;
     };
 
