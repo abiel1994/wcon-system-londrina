@@ -6384,12 +6384,17 @@ function renderFunil() {
   }
   if (!st.colunasAbertas) st.colunasAbertas = {};
 
+  // NOVO: "redistribuicao_sistema" é uma origem que só a gestão enxerga —
+  // pro vendedor, aparece disfarçada como "Pessoal" (ele não sabe que
+  // aquele lead já foi trabalhado por outra pessoa antes)
   function origemLabel(origem) {
+    if (origem === 'redistribuicao_sistema') return isG ? 'Redistribuição Sistema' : 'Pessoal';
     if (origem === 'trafego') return 'Tráfego';
     if (origem === 'pessoal') return 'Pessoal';
     return 'Discadora/IA';
   }
   function origemCores(origem) {
+    if (origem === 'redistribuicao_sistema') return isG ? { bg:'#FFF8E8', cor:'#7A4A0A' } : { bg:'#F3EEFB', cor:'#5B21B6' };
     if (origem === 'trafego') return { bg:'#E6F1FB', cor:'#0C447C' };
     if (origem === 'pessoal') return { bg:'#F3EEFB', cor:'#5B21B6' };
     return { bg:'var(--ink4)', cor:'var(--text2)' };
@@ -7937,6 +7942,9 @@ function renderLeadsPainelFunil() {
     <div class="page-title">Indicadores de Leads</div>
     <div class="page-sub">// equipe toda · ${mesLabel(st.mesSel)}</div>
   </div>
+  <div class="page-actions">
+    <button class="btn btn-primary btn-sm" onclick="abrirImportarLeads()">📤 Importar leads</button>
+  </div>
 </div>
 
 ${mesNav}
@@ -7997,7 +8005,7 @@ ${mesNav}
       </tr></thead>
       <tbody>
         ${leadsDoMes.map(l => {
-          const origemTxt = l.origem === 'trafego' ? `Tráfego${l.anuncioOrigem ? ' · '+l.anuncioOrigem : ''}` : l.origem === 'pessoal' ? 'Pessoal' : 'Discadora/IA';
+          const origemTxt = l.origem === 'redistribuicao_sistema' ? 'Redistribuição Sistema' : l.origem === 'trafego' ? `Tráfego${l.anuncioOrigem ? ' · '+l.anuncioOrigem : ''}` : l.origem === 'pessoal' ? 'Pessoal' : 'Discadora/IA';
           const origemCor = l.origem === 'trafego' ? 'background:#E6F1FB;color:#0C447C' : l.origem === 'pessoal' ? 'background:#F3EEFB;color:#5B21B6' : 'background:var(--ink3);color:var(--text2)';
           const vendAtual = DB.vendedores.find(v => v.id === l.vendedor)?.nome || '—';
           const vendAnterior = l.vendedorAnterior ? DB.vendedores.find(v => v.id === l.vendedorAnterior)?.nome : null;
@@ -8020,6 +8028,14 @@ ${mesNav}
         }).join('') || `<tr><td colspan="9" class="td-center" style="padding:40px;color:var(--text3)">Nenhum lead neste mês</td></tr>`}
       </tbody>
     </table>
+  </div>
+</div>
+
+<div class="overlay" id="m-importar-leads">
+  <div class="modal" style="max-width:640px">
+    <button class="modal-close" onclick="closeModal('m-importar-leads')">✕</button>
+    <div class="modal-title">Importar leads de uma planilha</div>
+    <div id="import-leads-conteudo"></div>
   </div>
 </div>
 `;
@@ -8497,6 +8513,208 @@ function toggleInteresseFunil(valor) {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   IMPORTAÇÃO DE LEADS EM MASSA (planilha) — só gestor
+   ═══════════════════════════════════════════════════════════════════════════ */
+let _importLeads = { linhas: [], cabecalhos: [], mapeamento: {}, passo: 1 };
+
+const CAMPOS_IMPORT_LEAD = [
+  ['nome', 'Nome do lead *'],
+  ['telefone', 'Telefone'],
+  ['valor_credito', 'Valor de crédito'],
+  ['interesse', 'Interesse'],
+  ['ignorar', 'Ignorar coluna'],
+];
+
+function abrirImportarLeads() {
+  const u = AppState.user;
+  if (u.role !== 'gestor' && u.role !== 'adm') return;
+  _importLeads = { linhas: [], cabecalhos: [], mapeamento: {}, passo: 1 };
+  renderPassoImportLeads();
+  openModal('m-importar-leads');
+}
+
+function renderPassoImportLeads() {
+  const el = document.getElementById('import-leads-conteudo');
+  if (!el) return;
+  const p = _importLeads.passo;
+
+  if (p === 1) {
+    el.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px">Passo 1 — Enviar arquivo</div>
+      <label for="import-leads-input" style="display:block;background:var(--ink3);border:2px dashed var(--line2);border-radius:12px;padding:50px 20px;text-align:center;cursor:pointer">
+        <div style="font-size:32px;margin-bottom:10px">📄</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text)">Clique pra escolher a planilha</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">Aceita .xlsx, .xls ou .csv</div>
+      </label>
+      <input type="file" id="import-leads-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="processarArquivoImportacaoLeads(this)">
+      <div id="import-leads-erro" style="color:var(--brand);font-size:12px;margin-top:10px"></div>
+    `;
+  } else if (p === 2) {
+    el.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Passo 2 — Mapear colunas</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:16px">Encontramos ${_importLeads.cabecalhos.length} coluna(s) na sua planilha (${_importLeads.linhas.length} linha(s) de dados). Diz pra gente o que cada uma significa:</div>
+      ${_importLeads.cabecalhos.map((_, i) => {
+        const amostra = (_importLeads.linhas[0] && _importLeads.linhas[0][i] != null) ? String(_importLeads.linhas[0][i]) : '(vazio)';
+        return `<div style="background:var(--ink3);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:160px">
+            <div style="font-size:9px;color:var(--text3)">COLUNA ${i+1} — EX:</div>
+            <div style="font-size:12px;font-weight:700">${amostra}</div>
+          </div>
+          <div style="font-size:14px;color:var(--text3)">→</div>
+          <select style="flex:1;min-width:160px" onchange="AppState._importMapTmp=AppState._importMapTmp||{};_importLeads.mapeamento[${i}]=this.value">
+            ${CAMPOS_IMPORT_LEAD.map(([val,lbl]) => `<option value="${val}"${(_importLeads.mapeamento[i]===val || (!_importLeads.mapeamento[i] && val==='ignorar')) ? ' selected':''}>${lbl}</option>`).join('')}
+          </select>
+        </div>`;
+      }).join('')}
+      <div id="import-leads-erro" style="color:var(--brand);font-size:12px;margin:10px 0"></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-ghost" onclick="_importLeads.passo=1;renderPassoImportLeads()">← Voltar</button>
+        <button class="btn btn-primary" style="flex:1" onclick="avancarConferenciaImportLeads()">Continuar →</button>
+      </div>
+    `;
+  } else {
+    const total = _importLeads.linhas.length;
+    const amostra = _importLeads.linhas.slice(0, 5);
+    const idxNome = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'nome');
+    const idxTel = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'telefone');
+    const idxCred = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'valor_credito');
+    const idxInt = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'interesse');
+
+    el.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:16px">Passo 3 — Conferir antes de importar</div>
+      <div style="background:var(--green-dim,#EAF3DE);border-radius:10px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#27500A">${total} lead(s) prontos pra importar</div>
+          <div style="font-size:10px;color:#3B6D11">Entram sem vendedor atribuído — vocês distribuem depois</div>
+        </div>
+        <div style="font-size:24px">✅</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome</th><th>Telefone</th><th style="text-align:right">Crédito</th><th>Interesse</th></tr></thead>
+          <tbody>
+            ${amostra.map(linha => `<tr>
+              <td>${idxNome!=null ? (linha[idxNome]||'—') : '—'}</td>
+              <td>${idxTel!=null ? (linha[idxTel]||'—') : '—'}</td>
+              <td style="text-align:right">${idxCred!=null && linha[idxCred] ? fmt(parseFloat(String(linha[idxCred]).replace(/[^\d.,]/g,'').replace(',','.'))||0) : '—'}</td>
+              <td>${idxInt!=null ? (linha[idxInt]||'—') : '—'}</td>
+            </tr>`).join('')}
+            ${total > 5 ? `<tr><td colspan="4" style="text-align:center;color:var(--text3)">... mais ${total-5} linha(s)</td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn btn-ghost" onclick="_importLeads.passo=2;renderPassoImportLeads()">← Voltar</button>
+        <button class="btn btn-primary" style="flex:1" id="btn-confirmar-import" onclick="confirmarImportacaoLeads()">✓ Importar ${total} lead(s)</button>
+      </div>
+    `;
+  }
+}
+
+function processarArquivoImportacaoLeads(input) {
+  const arquivo = input.files?.[0];
+  const erroEl = document.getElementById('import-leads-erro');
+  if (!arquivo) return;
+  if (typeof XLSX === 'undefined') { if (erroEl) erroEl.textContent = 'Não consegui carregar o leitor de planilhas. Recarregue a página e tente de novo.'; return; }
+
+  const leitor = new FileReader();
+  leitor.onload = (e) => {
+    try {
+      const dados = new Uint8Array(e.target.result);
+      const wb = XLSX.read(dados, { type: 'array' });
+      const primeiraAba = wb.SheetNames[0];
+      const linhasCompletas = XLSX.utils.sheet_to_json(wb.Sheets[primeiraAba], { header: 1, defval: '' });
+      const linhasFiltradas = linhasCompletas.filter(l => l.some(c => String(c).trim() !== ''));
+      if (linhasFiltradas.length === 0) { if (erroEl) erroEl.textContent = 'Não encontrei nenhuma linha com dado nessa planilha.'; return; }
+
+      const qtdColunas = Math.max(...linhasFiltradas.map(l => l.length));
+      _importLeads.cabecalhos = Array.from({length: qtdColunas}, (_, i) => `Coluna ${i+1}`);
+      _importLeads.linhas = linhasFiltradas;
+
+      // Tenta adivinhar o mapeamento automaticamente pelo conteúdo da 1ª linha
+      const amostra = linhasFiltradas[0];
+      _importLeads.mapeamento = {};
+      amostra.forEach((val, i) => {
+        const s = String(val).trim();
+        if (/^\+?\d[\d\s()-]{7,}$/.test(s)) _importLeads.mapeamento[i] = 'telefone';
+        else if (/^r?\$?\s?[\d.,]+$/.test(s) && /\d/.test(s)) _importLeads.mapeamento[i] = 'valor_credito';
+        else if (!_importLeads.mapeamento[0] && isNaN(parseFloat(s))) _importLeads.mapeamento[i] = i === 0 ? 'nome' : 'ignorar';
+      });
+      if (!Object.values(_importLeads.mapeamento).includes('nome')) _importLeads.mapeamento[0] = 'nome';
+
+      _importLeads.passo = 2;
+      renderPassoImportLeads();
+    } catch (err) {
+      console.error('Erro ao ler planilha:', err);
+      if (erroEl) erroEl.textContent = 'Não consegui ler esse arquivo. Confira se é um Excel (.xlsx/.xls) ou CSV válido.';
+    }
+  };
+  leitor.readAsArrayBuffer(arquivo);
+}
+
+function avancarConferenciaImportLeads() {
+  const temNome = Object.values(_importLeads.mapeamento).includes('nome');
+  const erroEl = document.getElementById('import-leads-erro');
+  if (!temNome) { if (erroEl) erroEl.textContent = 'Marque qual coluna é o "Nome do lead" — esse campo é obrigatório.'; return; }
+  _importLeads.passo = 3;
+  renderPassoImportLeads();
+}
+
+function valorMoedaParaNumeroTexto(s) {
+  if (s == null || s === '') return null;
+  if (typeof s === 'number') return s;
+  const limpo = String(s).replace(/[^\d.,]/g, '').replace(',', '.');
+  const n = parseFloat(limpo);
+  return isNaN(n) ? null : n;
+}
+
+async function confirmarImportacaoLeads() {
+  const u = AppState.user;
+  const unidade = unidadeEscopoAtual() || 'brusque';
+  const idxNome = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'nome');
+  const idxTel = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'telefone');
+  const idxCred = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'valor_credito');
+  const idxInt = Object.keys(_importLeads.mapeamento).find(i => _importLeads.mapeamento[i] === 'interesse');
+
+  const hojeStr = today();
+  const leadsParaInserir = _importLeads.linhas
+    .filter(linha => idxNome != null && String(linha[idxNome]||'').trim())
+    .map(linha => ({
+      nome: String(linha[idxNome]).trim(),
+      celular: idxTel != null ? String(linha[idxTel]||'').trim() || null : null,
+      valor_credito: idxCred != null ? valorMoedaParaNumeroTexto(linha[idxCred]) : null,
+      interesse: idxInt != null ? String(linha[idxInt]||'').trim() || null : null,
+      // NOVO: origem especial — só a gestão sabe que já foi trabalhado antes
+      origem: 'redistribuicao_sistema',
+      vendedor_id: null,
+      etapa: 'lead',
+      tentativas: 0,
+      unidade,
+      historico_etapas: [{ etapa: 'lead', data: hojeStr }],
+      criado_em: hojeStr,
+    }));
+
+  if (leadsParaInserir.length === 0) { Dialog.alert('Nada pra importar', ['Nenhuma linha válida encontrada com o mapeamento atual.']); return; }
+
+  const btn = document.getElementById('btn-confirmar-import');
+  if (btn) { btn.disabled = true; btn.textContent = 'Importando...'; }
+
+  try {
+    const resultado = await Servicos.criarLeadsFunilEmMassa(leadsParaInserir);
+    if (!resultado) throw new Error('Falha na importação.');
+    await carregarDadosIniciais();
+    closeModal('m-importar-leads');
+    Dialog.success('Importação concluída', [{ tipo:'destaque', label:'Leads importados', valor: String(resultado.length) }]);
+    rerenderModule('leadsPainel');
+  } catch (e) {
+    console.error('Erro ao importar leads:', e);
+    Dialog.alert('Erro na importação', ['Não foi possível importar os leads. Tente novamente ou confira sua conexão.']);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = `✓ Importar ${leadsParaInserir.length} lead(s)`; }
+  }
+}
+
 async function salvarNovoLeadFunil() {
   const nome = document.getElementById('mfn-nome').value.trim();
   if (!nome) { const e = document.getElementById('mfn-erro'); e.textContent = 'Digite o nome do lead.'; e.style.display = 'block'; return; }
@@ -8873,7 +9091,7 @@ function verDetalheLeadFunil(leadId) {
   const vend = DB.vendedores.find(v => v.id === lead.vendedor);
   const isG = (AppState.user.role === 'gestor' || AppState.user.role === 'adm');
   const etapaLabel = lead.etapa === 'desqualificado' ? 'Desqualificado' : (FUNIL_ETAPAS.find(e=>e.key===lead.etapa)?.label || lead.etapa);
-  const origemTexto = lead.origem === 'trafego' ? `Tráfego${lead.anuncioOrigem ? ' ('+lead.anuncioOrigem+')' : ''}` : lead.origem === 'pessoal' ? 'Pessoal' : 'Discadora/IA';
+  const origemTexto = lead.origem === 'redistribuicao_sistema' ? (isG ? 'Redistribuição Sistema' : 'Pessoal') : lead.origem === 'trafego' ? `Tráfego${lead.anuncioOrigem ? ' ('+lead.anuncioOrigem+')' : ''}` : lead.origem === 'pessoal' ? 'Pessoal' : 'Discadora/IA';
   _funilDetalheInteresseSel = [...(lead.interesse || [])];
 
   document.getElementById('mfd-conteudo').innerHTML = `
