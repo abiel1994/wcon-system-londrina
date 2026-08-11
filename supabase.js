@@ -305,6 +305,13 @@ const Servicos = {
     return data;
   },
 
+  // NOVO: importação em massa (planilha) — insere vários leads de uma vez
+  async criarLeadsFunilEmMassa(leads) {
+    const { data, error } = await sb.from('leads_funil').insert(leads).select();
+    if (error) { console.error('Erro na importação em massa:', error); return null; }
+    return data;
+  },
+
   async excluirLeadFunil(id) {
     const { error } = await sb.from('leads_funil').delete().eq('id', id);
     if (error) { console.error('Erro excluir lead:', error); return false; }
