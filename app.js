@@ -2003,14 +2003,26 @@ function abrirNovoVendedor() {
   document.getElementById('nv-email').value = '';
   const unidadeEscopo = unidadeEscopoAtual();
   const wrap = document.getElementById('nv-unidade-wrap');
+  const selectUnidade = document.getElementById('nv-unidade');
+
+  // NOVO: as opções do seletor são geradas a partir das unidades que
+  // REALMENTE existem no sistema (não mais fixas "Brusque"/"Blumenau") —
+  // assim funciona certo tanto pra sistemas com 1 unidade só (ex: Londrina)
+  // quanto pra multi-unidade (ex: Brusque+Blumenau)
+  const unidadesExistentes = [...new Set(DB.vendedores.map(v => v.unidade || 'brusque'))];
+  const unidadePadrao = unidadeEscopo || unidadesExistentes[0] || 'brusque';
+  const opcoes = unidadesExistentes.length > 0 ? unidadesExistentes : [unidadePadrao];
+  selectUnidade.innerHTML = opcoes.map(u => `<option value="${u}">${u.charAt(0).toUpperCase()+u.slice(1)}</option>`).join('');
+  selectUnidade.value = unidadePadrao;
+
   if (unidadeEscopo) {
     // Gerente de unidade (ex: Blumenau) não escolhe — sempre cadastra na
     // própria unidade dele
     wrap.style.display = 'none';
-    document.getElementById('nv-unidade').value = unidadeEscopo;
+  } else if (unidadesExistentes.length <= 1) {
+    wrap.style.display = 'none';
   } else {
     wrap.style.display = 'block';
-    document.getElementById('nv-unidade').value = 'brusque';
   }
   openModal('m-vendedor');
 }
@@ -2018,7 +2030,8 @@ function abrirNovoVendedor() {
 async function salvarNovoVendedor() {
   const nome  = document.getElementById('nv-nome').value.trim();
   const email = document.getElementById('nv-email').value.trim();
-  const unidade = document.getElementById('nv-unidade').value || unidadeEscopoAtual() || 'brusque';
+  const unidadesExistentes = [...new Set(DB.vendedores.map(v => v.unidade || 'brusque'))];
+  const unidade = document.getElementById('nv-unidade').value || unidadeEscopoAtual() || unidadesExistentes[0] || 'brusque';
 
   if (!nome)  { Dialog.alert('Campo obrigatório', ['Informe o nome do vendedor.']); return; }
   if (!email) { Dialog.alert('Campo obrigatório', ['Informe o e-mail do vendedor.']); return; }
