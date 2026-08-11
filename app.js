@@ -6476,6 +6476,7 @@ function renderFunil() {
     <div class="page-sub">// pipeline de leads · ${mesLabel(st.mesSel)}</div>
   </div>
   <div class="page-actions">
+    ${isG ? `<button class="btn btn-ghost btn-sm" onclick="abrirImportarLeads()">📤 Importar leads</button>` : ''}
     <button class="btn btn-primary btn-sm" onclick="abrirModalNovoLeadFunil()">+ Novo Lead</button>
   </div>
 </div>
@@ -8030,14 +8031,6 @@ ${mesNav}
     </table>
   </div>
 </div>
-
-<div class="overlay" id="m-importar-leads">
-  <div class="modal" style="max-width:640px">
-    <button class="modal-close" onclick="closeModal('m-importar-leads')">✕</button>
-    <div class="modal-title">Importar leads de uma planilha</div>
-    <div id="import-leads-conteudo"></div>
-  </div>
-</div>
 `;
 }
 
@@ -8530,6 +8523,21 @@ function abrirImportarLeads() {
   const u = AppState.user;
   if (u.role !== 'gestor' && u.role !== 'adm') return;
   _importLeads = { linhas: [], cabecalhos: [], mapeamento: {}, passo: 1 };
+
+  // NOVO: injeta o modal no container fixo (fora dos módulos) — assim
+  // funciona igual vindo do Funil ou da tela de Leads, sem duplicar IDs
+  const container = document.getElementById('modal-importar-leads-container');
+  if (container && !document.getElementById('m-importar-leads')) {
+    container.innerHTML = `
+      <div class="overlay" id="m-importar-leads">
+        <div class="modal" style="max-width:640px">
+          <button class="modal-close" onclick="closeModal('m-importar-leads')">✕</button>
+          <div class="modal-title">Importar leads de uma planilha</div>
+          <div id="import-leads-conteudo"></div>
+        </div>
+      </div>`;
+  }
+
   renderPassoImportLeads();
   openModal('m-importar-leads');
 }
