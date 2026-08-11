@@ -7664,13 +7664,16 @@ function renderTreinamentos() {
       ? `<div style="position:relative;background:#1A1D24;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center;${embed?.thumb ? `background-image:url('${embed.thumb}')` : ''}">
           <div style="width:44px;height:44px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px">▶</div>
         </div>`
+      : t.tipo === 'html'
+      ? `<div style="background:linear-gradient(135deg,var(--brand),#8a251b);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center"><div style="width:44px;height:44px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:18px">⚡</div></div>`
       : `<div style="background:var(--ink3);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center"><div style="width:44px;height:44px;border-radius:12px;background:var(--green-dim,#EAF3DE);display:flex;align-items:center;justify-content:center;font-size:18px">📄</div></div>`;
+    const tipoLabel = t.tipo === 'video' ? 'Vídeo' : t.tipo === 'html' ? 'Interativo' : 'Texto';
     return `<div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer" onclick="abrirDetalheTreinamento('${t.id}')">
       ${thumbHtml}
       <div style="padding:12px 14px">
         <span style="background:${cat.bg};color:${cat.cor};font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px">${cat.label.toUpperCase()}</span>
         <div style="font-size:13px;font-weight:700;margin-top:8px">${t.titulo}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px">${t.tipo === 'video' ? 'Vídeo' : 'Texto'} · ${fmtDate((t.criadoEm||'').substring(0,10))}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${tipoLabel} · ${fmtDate((t.criadoEm||'').substring(0,10))}</div>
       </div>
     </div>`;
   }).join('');
@@ -7694,7 +7697,7 @@ function renderTreinamentos() {
 
 <!-- Modal de detalhe -->
 <div class="overlay" id="m-treinamento-ver">
-  <div class="modal" style="width:680px">
+  <div class="modal" id="m-treinamento-ver-box" style="width:680px">
     <button class="modal-close" onclick="closeModal('m-treinamento-ver')">✕</button>
     <div id="mtv-conteudo"></div>
   </div>
@@ -7719,12 +7722,18 @@ function renderTreinamentos() {
         <select id="mtn-tipo" onchange="toggleTipoTreinamento()">
           <option value="video">Vídeo (YouTube/Vimeo)</option>
           <option value="texto">Texto / Script</option>
+          <option value="html">HTML interativo</option>
         </select>
       </div>
     </div>
 
     <div id="mtn-wrap-video" class="form-group"><label>Link do vídeo</label><input id="mtn-url" placeholder="https://youtube.com/watch?v=..."></div>
     <div id="mtn-wrap-texto" class="form-group" style="display:none"><label>Conteúdo do script</label><textarea id="mtn-conteudo" rows="6" placeholder="Cole o script aqui..."></textarea></div>
+    <div id="mtn-wrap-html" class="form-group" style="display:none">
+      <label>Código HTML completo</label>
+      <textarea id="mtn-html" rows="6" placeholder="Cole o HTML completo (com <html>, <style>, <script>...) aqui..." style="font-family:var(--mono);font-size:11px"></textarea>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">Cole o arquivo HTML inteiro — ele roda isolado, com toda a interatividade (cliques, checklist, etc.) funcionando normalmente.</div>
+    </div>
 
     <div class="form-group"><label>Público-alvo</label>
       <select id="mtn-publico">
@@ -7748,6 +7757,7 @@ function toggleTipoTreinamento() {
   const tipo = document.getElementById('mtn-tipo').value;
   document.getElementById('mtn-wrap-video').style.display = tipo === 'video' ? 'block' : 'none';
   document.getElementById('mtn-wrap-texto').style.display = tipo === 'texto' ? 'block' : 'none';
+  document.getElementById('mtn-wrap-html').style.display = tipo === 'html' ? 'block' : 'none';
 }
 
 function abrirNovoTreinamento() {
@@ -7755,6 +7765,7 @@ function abrirNovoTreinamento() {
   document.getElementById('mtn-titulo').value = '';
   document.getElementById('mtn-url').value = '';
   document.getElementById('mtn-conteudo').value = '';
+  document.getElementById('mtn-html').value = '';
   document.getElementById('mtn-tipo').value = 'video';
   toggleTipoTreinamento();
   openModal('m-treinamento-novo');
@@ -7766,21 +7777,24 @@ async function salvarNovoTreinamento() {
   const tipo = document.getElementById('mtn-tipo').value;
   const url = document.getElementById('mtn-url').value.trim();
   const conteudo = document.getElementById('mtn-conteudo').value.trim();
+  const html = document.getElementById('mtn-html').value.trim();
   const publico = document.getElementById('mtn-publico').value;
 
   if (!titulo) { Dialog.alert('Campo obrigatório', ['Informe o título.']); return; }
   if (tipo === 'video' && !url) { Dialog.alert('Campo obrigatório', ['Cole o link do vídeo.']); return; }
   if (tipo === 'texto' && !conteudo) { Dialog.alert('Campo obrigatório', ['Escreva o conteúdo do script.']); return; }
+  if (tipo === 'html' && !html) { Dialog.alert('Campo obrigatório', ['Cole o código HTML.']); return; }
   if (tipo === 'video' && !extrairEmbedVideo(url)) { Dialog.alert('Link inválido', ['Não reconheci esse link como YouTube ou Vimeo. Confira e tente de novo.']); return; }
 
   const btn = document.querySelector('#m-treinamento-novo .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
 
   try {
+    const conteudoFinal = tipo === 'texto' ? conteudo : (tipo === 'html' ? html : null);
     const payload = {
       titulo, categoria, tipo,
       url_video: tipo === 'video' ? url : null,
-      conteudo: tipo === 'texto' ? conteudo : null,
+      conteudo: conteudoFinal,
       publico_alvo: publico,
       criado_por: AppState.user.nome,
     };
@@ -7807,10 +7821,16 @@ function abrirDetalheTreinamento(id) {
   const embed = t.tipo === 'video' ? extrairEmbedVideo(t.urlVideo) : null;
   const podeGerenciar = podeGerenciarTreinamentos();
 
+  const box = document.getElementById('m-treinamento-ver-box');
+  if (box) box.style.width = t.tipo === 'html' ? '95vw' : '680px';
+  if (box) box.style.maxWidth = t.tipo === 'html' ? '1100px' : '680px';
+
   const corpo = t.tipo === 'video'
     ? (embed
         ? `<div style="border-radius:10px;overflow:hidden;background:#000"><iframe src="${embed.src}" style="width:100%;aspect-ratio:16/9;border:0" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>`
         : `<div class="alert alert-amber">Não consegui identificar esse link de vídeo.</div>`)
+    : t.tipo === 'html'
+    ? `<div style="border-radius:10px;overflow:hidden;border:1px solid var(--line)"><iframe id="mtv-iframe-html" style="width:100%;height:75vh;border:0;display:block" sandbox="allow-scripts allow-same-origin"></iframe></div>`
     : `<div style="background:var(--ink3);border-radius:10px;padding:16px;font-size:13px;line-height:1.7;white-space:pre-wrap">${t.conteudo}</div>`;
 
   document.getElementById('mtv-conteudo').innerHTML = `
@@ -7821,6 +7841,13 @@ function abrirDetalheTreinamento(id) {
     ${podeGerenciar ? `<div class="modal-actions"><button class="btn btn-ghost" style="color:var(--brand)" onclick="excluirTreinamentoUI('${t.id}')">✕ Excluir</button></div>` : ''}
   `;
   openModal('m-treinamento-ver');
+
+  // NOVO: o HTML precisa ser injetado via srcdoc DEPOIS do iframe existir no
+  // DOM — roda isolado (sandbox), com toda a interatividade original intacta
+  if (t.tipo === 'html') {
+    const iframe = document.getElementById('mtv-iframe-html');
+    if (iframe) iframe.srcdoc = t.conteudo || '<p style="font-family:sans-serif;padding:20px">Conteúdo vazio.</p>';
+  }
 }
 
 async function excluirTreinamentoUI(id) {
