@@ -1232,12 +1232,6 @@ function atualizarSeletorUnidade() {
   if (!wrap) return;
   if (!u || u.role !== 'gestor' && u.role !== 'adm' || u.unidadeEscopo) { wrap.innerHTML = ''; return; }
 
-  // NOVO: se só existe UMA unidade nos dados (ex: Londrina, sem uma 2ª
-  // unidade igual Blumenau), não faz sentido mostrar esse seletor — esconde
-  // sozinho, sem precisar de configuração manual por sistema.
-  const unidadesExistentes = new Set(DB.vendedores.map(v => v.unidade || 'brusque'));
-  if (unidadesExistentes.size <= 1) { wrap.innerHTML = ''; return; }
-
   const atual = AppState.unidadeVisualizacao || 'todas';
   const opcoes = [['todas','Ambas'],['brusque','Brusque'],['blumenau','Blumenau']];
   wrap.innerHTML = `<div style="display:flex;gap:2px;background:var(--ink3);border-radius:8px;padding:3px;margin-right:6px">
@@ -1294,7 +1288,7 @@ function buildSidebar() {
 
   const podeTabelas = podeAcessarTabelas();
   const visibles = isG
-    ? ['dashboard','trabalho','vendedores','clientes','funil','agendaFunil','relatorio','comissao','comissaoLideranca','inadimplencia','estornos','painelExecutivo','leadsPainel',...((!u.unidadeEscopo && new Set(DB.vendedores.map(v=>v.unidade||'brusque')).size>1)?['transferenciasUnidade']:[]),...(podeTabelas?['tabelas']:[]),'configuracoes']
+    ? ['dashboard','trabalho','vendedores','clientes','funil','agendaFunil','relatorio','comissao','comissaoLideranca','inadimplencia','estornos','painelExecutivo','leadsPainel',...(!u.unidadeEscopo?['transferenciasUnidade']:[]),...(podeTabelas?['tabelas']:[]),'configuracoes']
     : isSup
       ? ['dashboard','trabalho','funil','agendaFunil','relatorio','comissao','comissaoLideranca','inadimplencia','estornos',...(podeTabelas?['tabelas']:[])]
       : ['dashboard','trabalho','funil','agendaFunil','relatorio','comissao','inadimplencia','estornos',...(podeTabelas?['tabelas']:[])];
@@ -2003,26 +1997,14 @@ function abrirNovoVendedor() {
   document.getElementById('nv-email').value = '';
   const unidadeEscopo = unidadeEscopoAtual();
   const wrap = document.getElementById('nv-unidade-wrap');
-  const selectUnidade = document.getElementById('nv-unidade');
-
-  // NOVO: as opções do seletor são geradas a partir das unidades que
-  // REALMENTE existem no sistema (não mais fixas "Brusque"/"Blumenau") —
-  // assim funciona certo tanto pra sistemas com 1 unidade só (ex: Londrina)
-  // quanto pra multi-unidade (ex: Brusque+Blumenau)
-  const unidadesExistentes = [...new Set(DB.vendedores.map(v => v.unidade || 'brusque'))];
-  const unidadePadrao = unidadeEscopo || unidadesExistentes[0] || 'brusque';
-  const opcoes = unidadesExistentes.length > 0 ? unidadesExistentes : [unidadePadrao];
-  selectUnidade.innerHTML = opcoes.map(u => `<option value="${u}">${u.charAt(0).toUpperCase()+u.slice(1)}</option>`).join('');
-  selectUnidade.value = unidadePadrao;
-
   if (unidadeEscopo) {
     // Gerente de unidade (ex: Blumenau) não escolhe — sempre cadastra na
     // própria unidade dele
     wrap.style.display = 'none';
-  } else if (unidadesExistentes.length <= 1) {
-    wrap.style.display = 'none';
+    document.getElementById('nv-unidade').value = unidadeEscopo;
   } else {
     wrap.style.display = 'block';
+    document.getElementById('nv-unidade').value = 'brusque';
   }
   openModal('m-vendedor');
 }
@@ -2030,8 +2012,7 @@ function abrirNovoVendedor() {
 async function salvarNovoVendedor() {
   const nome  = document.getElementById('nv-nome').value.trim();
   const email = document.getElementById('nv-email').value.trim();
-  const unidadesExistentes = [...new Set(DB.vendedores.map(v => v.unidade || 'brusque'))];
-  const unidade = document.getElementById('nv-unidade').value || unidadeEscopoAtual() || unidadesExistentes[0] || 'brusque';
+  const unidade = document.getElementById('nv-unidade').value || unidadeEscopoAtual() || 'brusque';
 
   if (!nome)  { Dialog.alert('Campo obrigatório', ['Informe o nome do vendedor.']); return; }
   if (!email) { Dialog.alert('Campo obrigatório', ['Informe o e-mail do vendedor.']); return; }
@@ -6306,6 +6287,40 @@ function renderFunil() {
   const projecaoMedia = (projecaoPorVolume + projecaoPorReuniao) / 2;
   const pctProjRealizada = projecaoMedia > 0 ? Math.min((valorVendasTotal/projecaoMedia)*100, 999) : 0;
 
+  // NOVO: funil em cascata + taxas de conversão — usa a MAIOR etapa que
+  // cada lead já alcançou (não só a etapa atual), então mesmo quem depois
+  // desqualificou ainda conta como "chegou até ali" no funil
+  function maiorEtapaIndice(l) {
+    const idxAtual = FUNIL_ETAPA_ORDEM.indexOf(l.etapa);
+    const idxHist = (l.historico || []).map(h => FUNIL_ETAPA_ORDEM.indexOf(h.etapa)).filter(i => i >= 0);
+    return Math.max(idxAtual, ...idxHist, -1);
+  }
+  const idxQualif = FUNIL_ETAPA_ORDEM.indexOf('qualificacao');
+  const idxAgend  = FUNIL_ETAPA_ORDEM.indexOf('agendamento');
+  const idxReuniaoFeita = FUNIL_ETAPA_ORDEM.indexOf('reuniaoFeita');
+  const idxVenda  = FUNIL_ETAPA_ORDEM.indexOf('venda');
+
+  const leadsComEtapa = leadsVisiveisMes.map(l => ({ l, idx: maiorEtapaIndice(l) }));
+  const qtdLeadsCascata = leadsComEtapa.length;
+  const qtdQualifCascata = leadsComEtapa.filter(x => x.idx >= idxQualif).length;
+  const qtdAgendCascata  = leadsComEtapa.filter(x => x.idx >= idxAgend).length;
+  const qtdReuniaoCascata = leadsComEtapa.filter(x => x.idx >= idxReuniaoFeita).length;
+  const qtdVendaCascata  = leadsComEtapa.filter(x => x.idx >= idxVenda).length;
+
+  const taxaComparecimento = qtdAgendCascata > 0 ? (qtdReuniaoCascata/qtdAgendCascata)*100 : 0;
+  const taxaFechamento = qtdReuniaoCascata > 0 ? (qtdVendaCascata/qtdReuniaoCascata)*100 : 0;
+  const conversaoGeral = qtdLeadsCascata > 0 ? (qtdVendaCascata/qtdLeadsCascata)*100 : 0;
+
+  // Ciclo médio: dias entre o primeiro contato e a venda, pros leads vendidos no período
+  const ciclosDias = vendasDoMes.map(l => {
+    const inicio = l.primeiroContatoTs ? new Date(l.primeiroContatoTs) : (l.criadoEm ? new Date(l.criadoEm+'T00:00:00') : null);
+    const fimStr = dataUltimaEtapaFunil(l, 'venda');
+    const fim = fimStr ? new Date(fimStr+'T00:00:00') : null;
+    if (!inicio || !fim) return null;
+    return Math.round((fim - inicio) / 86400000);
+  }).filter(d => d !== null && d >= 0);
+  const cicloMedio = ciclosDias.length > 0 ? Math.round(ciclosDias.reduce((a,d)=>a+d,0)/ciclosDias.length) : null;
+
   const _leadsSemVendedor = DB.leadsFunil.filter(l => !l.vendedor && l.etapa !== 'venda' && l.etapa !== 'desqualificado').length;
   const vendorTabsFunil = isG ? `
   <div class="vendor-filter">
@@ -6441,57 +6456,83 @@ ${!isG ? `
   </div>
 </div>` : ''}
 
-<div class="card">
-  <div class="card-body">
-    <div class="form-divider" style="margin-bottom:14px">Metas do mês</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:20px">
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--text2);font-weight:600">Reuniões</span>
-          <span style="font-size:15px;font-weight:800;font-family:var(--mono)">${totalReunioes}/${metaReunioes}</span>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
+  <div class="card" style="margin-bottom:0">
+    <div class="card-body">
+      <div class="stat-label">Reuniões · Vendas (mês)</div>
+      <div style="display:flex;gap:20px;margin-top:6px">
+        <div>
+          <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${totalReunioes}<span style="font-size:11px;color:var(--text3)">/${metaReunioes}</span></div>
+          <div class="progress-wrap" style="margin-top:4px;width:70px"><div class="progress-bar" style="width:${Math.min(totalReunioes/metaReunioes*100,100)}%;background:#EF9F27"></div></div>
         </div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(totalReunioes/metaReunioes*100,100)}%;background:var(--brand)"></div></div>
-      </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--text2);font-weight:600">Vendas</span>
-          <span style="font-size:15px;font-weight:800;font-family:var(--mono)">${totalVendas}/${metaVendas}</span>
+        <div>
+          <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${totalVendas}<span style="font-size:11px;color:var(--text3)">/${metaVendas}</span></div>
+          <div class="progress-wrap" style="margin-top:4px;width:70px"><div class="progress-bar" style="width:${Math.min(totalVendas/metaVendas*100,100)}%;background:var(--brand)"></div></div>
         </div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(totalVendas/metaVendas*100,100)}%;background:var(--brand)"></div></div>
       </div>
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
-          <span style="font-size:12px;color:var(--text2);font-weight:600">Ligações</span>
-          <span style="font-size:15px;font-weight:800;font-family:var(--mono)">${totalLigacoes}/${metaLigacoes}</span>
-        </div>
-        <div class="progress-wrap"><div class="progress-bar" style="width:${Math.min(totalLigacoes/metaLigacoes*100,100)}%;background:var(--brand)"></div></div>
-        ${isG ? `<div style="margin-top:4px"><button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirEditarLigacoesFunil()">✏️ Corrigir registros</button></div>` : ''}
+      ${isG ? `<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirEditarLigacoesFunil()">✏️ Corrigir registros de ligação</button></div>` : ''}
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <div class="card-body">
+      <div class="stat-label">Ticket médio · Ciclo médio</div>
+      <div style="display:flex;gap:20px;margin-top:6px">
+        <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${fmt(ticketMedio)}</div>
+        <div style="font-size:17px;font-weight:800;font-family:var(--mono)">${cicloMedio != null ? cicloMedio+' dias' : '—'}</div>
       </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">${leadsAtivosMes.length} lead(s) ativo(s)</div>
     </div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px">
   <div class="card" style="margin-bottom:0">
     <div class="card-body">
-      <div class="stat-label">Crédito prospectado</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${fmt(creditoProspectado)}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">meta: ${fmt(metaCredito)}</div>
+      <div class="stat-label">Conversão geral</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${conversaoGeral.toFixed(1)}%</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">lead → venda</div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:0;${taxaComparecimento < 70 && qtdAgendCascata > 0 ? 'border:1px solid var(--brand)' : ''}">
+    <div class="card-body">
+      <div class="stat-label" style="${taxaComparecimento < 70 && qtdAgendCascata > 0 ? 'color:var(--brand)' : ''}">Taxa de comparecimento</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px;${taxaComparecimento < 70 && qtdAgendCascata > 0 ? 'color:var(--brand)' : ''}">${taxaComparecimento.toFixed(0)}%</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">agendou → compareceu</div>
     </div>
   </div>
   <div class="card" style="margin-bottom:0">
     <div class="card-body">
-      <div class="stat-label">Ticket médio</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${fmt(ticketMedio)}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">${leadsAtivosMes.length} lead(s) ativo(s) · meta 200-300k</div>
+      <div class="stat-label">Taxa de fechamento</div>
+      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${taxaFechamento.toFixed(0)}%</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">reunião → venda</div>
     </div>
   </div>
-  <div class="card" style="margin-bottom:0">
-    <div class="card-body">
-      <div class="stat-label">Conversão tráfego</div>
-      <div style="font-size:20px;font-weight:800;font-family:var(--mono);margin-top:6px">${conversaoPagoReal.toFixed(1)}%</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:3px">${vendasPago} de ${leadsPago.length} leads</div>
-    </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="stat-label" style="margin-bottom:12px">Funil em cascata — onde está o gargalo</div>
+    ${(() => {
+      const etapasCascata = [
+        ['Leads', qtdLeadsCascata, '#0C447C'],
+        ['Qualific.', qtdQualifCascata, '#0C447C'],
+        ['Agendado', qtdAgendCascata, '#EF9F27'],
+        ['Reunião', qtdReuniaoCascata, '#C8392B'],
+        ['Venda', qtdVendaCascata, '#639922'],
+      ];
+      const maxQtd = Math.max(qtdLeadsCascata, 1);
+      return etapasCascata.map(([label, qtd, cor], i) => {
+        const larguraPct = Math.max((qtd/maxQtd)*100, qtd > 0 ? 6 : 2);
+        const anterior = i > 0 ? etapasCascata[i-1][1] : null;
+        const queda = anterior && anterior > 0 ? Math.round((1 - qtd/anterior)*100) : null;
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <div style="width:64px;font-size:10px;color:var(--text3);flex-shrink:0">${label}</div>
+          <div style="background:${cor};height:22px;border-radius:4px;width:${larguraPct}%;display:flex;align-items:center;padding-left:8px;color:#fff;font-size:11px;font-weight:700;white-space:nowrap;min-width:34px">
+            ${qtd}${queda != null && queda > 25 ? `<span style="opacity:0.75;margin-left:6px;font-weight:500">← queda de ${queda}%</span>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    })()}
   </div>
 </div>
 
