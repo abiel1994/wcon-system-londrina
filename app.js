@@ -5075,6 +5075,7 @@ let _simulUnidade = null;
 function verSimulacao(tabId, unidade) {
   _simulTabela = tabId;
   _simulUnidade = unidade || 'brusque';
+  _simulCardAberto = null;
   const tab = DB.tabelas.find(t => t.id === tabId && (t.unidade||'brusque') === _simulUnidade);
   document.getElementById('ms-title').textContent = `Simular — ${tab?.nome}`;
   document.getElementById('ms-val').value = '';
@@ -5082,6 +5083,8 @@ function verSimulacao(tabId, unidade) {
   document.getElementById('ms-result').innerHTML = '';
   openModal('m-simul');
 }
+
+let _simulCardAberto = null;
 
 function simularTabela() {
   const val = parseFloat(document.getElementById('ms-val')?.value) || 0;
@@ -5093,37 +5096,13 @@ function simularTabela() {
   const unidade = _simulUnidade || 'brusque';
   const tabelasDaUnidade = DB.tabelas.filter(t => (t.unidade||'brusque') === unidade);
   const vendaFake = { tabela: _simulTabela, valor: val, dvenda: dv, d2parc: d2, parcelas: [] };
-
-  // NOVO: monta uma tabelinha de resultado genérica, reaproveitada pros 3 níveis
-  function montarBloco(titulo, cor, corBg, pc) {
-    const ativas = pc.filter(p => p.ativa);
-    const total = ativas.reduce((a, p) => a + p.valor, 0);
-    if (ativas.length === 0) return '';
-    return `
-    <div style="margin-top:14px">
-      <div style="background:${corBg};border:1px solid ${cor};border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span style="font-weight:700;color:${cor};font-size:12px">${titulo}</span>
-        <span style="font-family:var(--mono);font-size:16px;font-weight:800;color:${cor}">${fmt(total)}</span>
-      </div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>#</th><th>Venc. cliente</th><th>Pgto comissão</th><th>Valor</th><th>%</th></tr></thead>
-        <tbody>${ativas.map(p => `<tr>
-          <td class="td-mono">${p.n}ª</td>
-          <td class="td-mono">${fmtDate(p.dataVencCliente)}</td>
-          <td class="td-mono" style="color:${cor}">${fmtDate(p.dataPgto)}</td>
-          <td class="td-mono" style="color:${cor}">${fmt(p.valor)}</td>
-          <td class="td-mono">${p.pct}%</td>
-        </tr>`).join('')}</tbody>
-      </table></div>
-    </div>`;
-  }
+  const tabOriginal = tabelasDaUnidade.find(t => t.id === _simulTabela);
 
   // 1. Consultor — tabela normal
   const pcConsultor = calcParcelas(vendaFake, tabelasDaUnidade);
 
   // 2. Supervisor/Supervisor Treinee — vendas próprias
   const regraPropria = buscarRegraPorTabelaOuRef(DB.tabelasSupervisor, 'id', _simulTabela, unidade);
-  const tabOriginal = tabelasDaUnidade.find(t => t.id === _simulTabela);
   const pcPropria = regraPropria
     ? calcParcelas(vendaFake, [{ id: _simulTabela, nome: tabOriginal?.nome || _simulTabela, parcelas: regraPropria.parcelas }])
     : [];
@@ -5134,17 +5113,40 @@ function simularTabela() {
     ? calcParcelas(vendaFake, [{ id: _simulTabela, nome: tabOriginal?.nome || _simulTabela, parcelas: regraEquipe.parcelas }])
     : [];
 
-  const totalGeral = [...pcConsultor, ...pcPropria, ...pcEquipe].filter(p=>p.ativa).reduce((a,p)=>a+p.valor,0);
+  const blocos = [
+    ['consultor', 'Consultor', 'var(--text)', 'var(--ink3)', pcConsultor],
+    ['propria', 'Supervisor Treinee · vendas próprias', '#0C447C', '#E6F1FB', pcPropria],
+    ['equipe', 'Supervisor Treinee · override sobre a equipe', '#27500A', '#EAF3DE', pcEquipe],
+  ];
 
-  res.innerHTML = `
-    <div style="margin-top:14px;background:var(--gold-dim);border:1px solid var(--gold-glow);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-weight:700;color:var(--gold)">Ganho total combinado (se a mesma pessoa recebesse tudo)</span>
-      <span style="font-family:var(--mono);font-size:18px;font-weight:800;color:var(--gold)">${fmt(totalGeral)}</span>
-    </div>
-    ${montarBloco('Consultor', 'var(--text)', 'var(--ink3)', pcConsultor)}
-    ${montarBloco('Supervisor Treinee · vendas próprias', '#0C447C', '#E6F1FB', pcPropria)}
-    ${montarBloco('Supervisor Treinee · override sobre a equipe', '#27500A', '#EAF3DE', pcEquipe)}
-  `;
+  res.innerHTML = blocos.map(([chave, titulo, cor, corBg, pc]) => {
+    const ativas = pc.filter(p => p.ativa);
+    if (ativas.length === 0) return '';
+    const total = ativas.reduce((a, p) => a + p.valor, 0);
+    const aberto = _simulCardAberto === chave;
+    return `
+    <div style="background:var(--ink2);border-radius:10px;margin-bottom:8px;overflow:hidden;${aberto?`border:1px solid ${cor}`:''}">
+      <div onclick="_simulCardAberto=(_simulCardAberto==='${chave}'?null:'${chave}');simularTabela()" style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;${aberto?`background:${corBg}`:''}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:11px;color:${aberto?cor:'var(--text3)'}">${aberto?'▾':'▸'}</span>
+          <span style="font-size:13px;font-weight:700;color:${aberto?cor:'var(--text)'}">${titulo}</span>
+        </div>
+        <span style="font-family:var(--mono);font-size:16px;font-weight:800;color:${aberto?cor:'var(--text)'}">${fmt(total)}</span>
+      </div>
+      ${aberto ? `<div style="padding:0 16px 14px">
+        <div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Venc. cliente</th><th>Pgto comissão</th><th>Valor</th><th>%</th></tr></thead>
+          <tbody>${ativas.map(p => `<tr>
+            <td class="td-mono">${p.n}ª</td>
+            <td class="td-mono">${fmtDate(p.dataVencCliente)}</td>
+            <td class="td-mono" style="color:${cor}">${fmtDate(p.dataPgto)}</td>
+            <td class="td-mono" style="color:${cor}">${fmt(p.valor)}</td>
+            <td class="td-mono">${p.pct}%</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
