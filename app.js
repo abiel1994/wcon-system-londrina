@@ -4935,7 +4935,7 @@ ${cardsLista || `<div class="empty-state"><div class="empty-sub">Nenhuma tabela 
     <div class="modal-title" id="ms-title">Simular venda</div>
     <div class="modal-sub">Calcule a projeção de comissões para essa tabela</div>
     <div class="form-row cols-2">
-      <div class="form-group"><label>Valor do crédito (R$)</label><input type="number" id="ms-val" placeholder="Ex: 50000" oninput="simularTabela()"></div>
+      <div class="form-group"><label>Valor do crédito (R$)</label><input type="text" inputmode="numeric" id="ms-val" placeholder="R$ 0,00" oninput="aplicarMascaraMoeda(this, event); simularTabela()"></div>
       <div class="form-group"><label>Data da venda</label><input type="date" id="ms-dv" value="${today()}" oninput="simularTabela()"></div>
     </div>
     <div class="form-row cols-1">
@@ -5078,7 +5078,9 @@ function verSimulacao(tabId, unidade) {
   _simulCardAberto = null;
   const tab = DB.tabelas.find(t => t.id === tabId && (t.unidade||'brusque') === _simulUnidade);
   document.getElementById('ms-title').textContent = `Simular — ${tab?.nome}`;
-  document.getElementById('ms-val').value = '';
+  const msValEl = document.getElementById('ms-val');
+  msValEl.value = '';
+  msValEl.dataset.raw = '';
   document.getElementById('ms-d2').value = '';
   document.getElementById('ms-result').innerHTML = '';
   openModal('m-simul');
@@ -5087,7 +5089,7 @@ function verSimulacao(tabId, unidade) {
 let _simulCardAberto = null;
 
 function simularTabela() {
-  const val = parseFloat(document.getElementById('ms-val')?.value) || 0;
+  const val = valorMoedaParaNumero(document.getElementById('ms-val')?.value);
   const dv  = document.getElementById('ms-dv')?.value;
   const d2  = document.getElementById('ms-d2')?.value;
   const res = document.getElementById('ms-result');
