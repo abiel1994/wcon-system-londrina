@@ -5125,7 +5125,7 @@ function simularTabela() {
     const total = ativas.reduce((a, p) => a + p.valor, 0);
     const aberto = _simulCardAberto === chave;
     return `
-    <div style="background:var(--ink2);border-radius:10px;margin-bottom:8px;overflow:hidden;${aberto?`border:1px solid ${cor}`:''}">
+    <div class="card" style="margin-bottom:8px;${aberto?`border-color:${cor}`:''}">
       <div onclick="_simulCardAberto=(_simulCardAberto==='${chave}'?null:'${chave}');simularTabela()" style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;${aberto?`background:${corBg}`:''}">
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-size:11px;color:${aberto?cor:'var(--text3)'}">${aberto?'▾':'▸'}</span>
@@ -5133,7 +5133,7 @@ function simularTabela() {
         </div>
         <span style="font-family:var(--mono);font-size:16px;font-weight:800;color:${aberto?cor:'var(--text)'}">${fmt(total)}</span>
       </div>
-      ${aberto ? `<div style="padding:0 16px 14px">
+      ${aberto ? `<div class="card-body" style="padding-top:0;border-top:1px solid var(--line)">
         <div class="table-wrap"><table>
           <thead><tr><th>#</th><th>Venc. cliente</th><th>Pgto comissão</th><th>Valor</th><th>%</th></tr></thead>
           <tbody>${ativas.map(p => `<tr>
