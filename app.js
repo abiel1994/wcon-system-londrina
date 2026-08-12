@@ -8778,7 +8778,16 @@ async function salvarNovoLeadFunil() {
 
 async function moverEtapaFunil(leadId, novaEtapa) {
   if (novaEtapa === 'venda') {
-    abrirNovaVendaDoLead(leadId);
+    const lead = DB.leadsFunil.find(l => l.id === leadId);
+    const nomeLead = lead?.nome || 'esse lead';
+    const ok = await Dialog.confirm('Cadastrar a venda agora?', [
+      `Pra gerar comissão, ${nomeLead} precisa virar uma venda de verdade no Relatório.`,
+      'Quer cadastrar agora, com os dados já preenchidos?',
+    ]);
+    if (ok) abrirNovaVendaDoLead(leadId);
+    // Se escolher "Depois": não muda a etapa do lead ainda — ele só entra em
+    // "Venda" de verdade quando a venda for realmente cadastrada. Assim não
+    // fica um card em "Venda" sem comissão vinculada, esquecido.
     return;
   }
   if (novaEtapa === 'reuniao1' || novaEtapa === 'reuniao2') {
