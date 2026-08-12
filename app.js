@@ -5114,9 +5114,9 @@ function simularTabela() {
     : [];
 
   const blocos = [
-    ['consultor', 'Consultor', 'var(--text)', 'var(--ink3)', pcConsultor],
-    ['propria', 'Supervisor Treinee · vendas próprias', '#0C447C', '#E6F1FB', pcPropria],
-    ['equipe', 'Supervisor Treinee · override sobre a equipe', '#27500A', '#EAF3DE', pcEquipe],
+    ['consultor', 'Consultor', 'var(--brand)', 'var(--red-dim)', pcConsultor],
+    ['propria', 'Supervisor Treinee · vendas próprias', 'var(--brand)', 'var(--red-dim)', pcPropria],
+    ['equipe', 'Supervisor Treinee · override sobre a equipe', 'var(--brand)', 'var(--red-dim)', pcEquipe],
   ];
 
   res.innerHTML = blocos.map(([chave, titulo, cor, corBg, pc]) => {
@@ -5126,14 +5126,11 @@ function simularTabela() {
     const aberto = _simulCardAberto === chave;
     return `
     <div class="card" style="margin-bottom:8px;${aberto?`border-color:${cor}`:''}">
-      <div onclick="_simulCardAberto=(_simulCardAberto==='${chave}'?null:'${chave}');simularTabela()" style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;${aberto?`background:${corBg}`:''}">
-        <div style="display:flex;align-items:center;gap:10px">
-          <span style="font-size:11px;color:${aberto?cor:'var(--text3)'}">${aberto?'▾':'▸'}</span>
-          <span style="font-size:13px;font-weight:700;color:${aberto?cor:'var(--text)'}">${titulo}</span>
-        </div>
-        <span style="font-family:var(--mono);font-size:16px;font-weight:800;color:${aberto?cor:'var(--text)'}">${fmt(total)}</span>
+      <div onclick="_simulCardAberto=(_simulCardAberto==='${chave}'?null:'${chave}');simularTabela()" style="background:${cor};padding:9px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+        <span style="font-size:10px;font-weight:700;color:#fff;letter-spacing:0.8px;text-transform:uppercase">${aberto?'▾':'▸'} ${titulo}</span>
+        <span style="font-family:var(--mono);font-size:13px;font-weight:700;color:#fff">${fmt(total)}</span>
       </div>
-      ${aberto ? `<div class="card-body" style="padding-top:0;border-top:1px solid var(--line)">
+      ${aberto ? `<div class="card-body">
         <div class="table-wrap"><table>
           <thead><tr><th>#</th><th>Venc. cliente</th><th>Pgto comissão</th><th>Valor</th><th>%</th></tr></thead>
           <tbody>${ativas.map(p => `<tr>
