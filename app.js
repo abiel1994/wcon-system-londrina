@@ -3034,6 +3034,15 @@ let _vendaOrigemLeadId = null;
 function abrirNovaVendaDoLead(leadId) {
   const lead = DB.leadsFunil.find(l => l.id === leadId);
   if (!lead) return;
+
+  // NOVO: mesma segurança — se o modal ainda não existe no DOM (porque
+  // estamos vindo do Funil, não do Relatório), navega e tenta de novo
+  if (!document.getElementById('m-venda')) {
+    Router.navigate('relatorio');
+    setTimeout(() => abrirNovaVendaDoLead(leadId), 200);
+    return;
+  }
+
   _vendaOrigemLeadId = leadId;
 
   abrirNovaVenda(); // monta o formulário base (tabelas, visibilidade de vendedor, etc.)
@@ -3054,6 +3063,14 @@ function abrirNovaVendaDoLead(leadId) {
 }
 
 function abrirNovaVenda() {
+  // NOVO: o modal "m-venda" só existe dentro da tela de Relatório — se
+  // chamado de outro lugar (ex: pelo Funil), garante que navega pra lá
+  // primeiro, senão o modal simplesmente não existe no DOM ainda
+  if (!document.getElementById('m-venda')) {
+    Router.navigate('relatorio');
+    setTimeout(() => abrirNovaVenda(), 150);
+    return;
+  }
   AppState.editing.vendaId = null;
   document.getElementById('mv-title').textContent = 'Registrar venda';
   document.getElementById('mv-cli').value = '';
@@ -9342,6 +9359,19 @@ async function adicionarFeedbackLeadFunil(leadId) {
 async function moverEtapaDiretoFunil(leadId, novaEtapa) {
   const lead = DB.leadsFunil.find(l => l.id === leadId);
   if (!lead) return;
+
+  if (novaEtapa === 'venda') {
+    const ok = await Dialog.confirm('Cadastrar a venda agora?', [
+      `Pra gerar comissão, ${lead.nome || 'esse lead'} precisa virar uma venda de verdade no Relatório.`,
+      'Quer cadastrar agora, com os dados já preenchidos?',
+    ]);
+    if (ok) { abrirNovaVendaDoLead(leadId); return; }
+    // "Depois": não muda a etapa ainda, e reseta o seletor pra não ficar
+    // mostrando "Venda" selecionado sem ter salvo de verdade
+    verDetalheLeadFunil(leadId);
+    return;
+  }
+
   const historico = [...(lead.historico||[]), { etapa: novaEtapa, data: today(), nota: 'Ajustado manualmente pelo gestor' }];
   await Servicos.atualizarLeadFunil(leadId, { etapa: novaEtapa, historico_etapas: historico });
   await carregarDadosIniciais();
